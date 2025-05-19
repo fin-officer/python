@@ -1,7 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, EmailStr, Field
 
 
 # Enumy dla statusów i analizy
@@ -61,7 +62,7 @@ class EmailSchema(BaseModel):
                 "from_email": "user@example.com",
                 "to_email": "service@example.com",
                 "subject": "Zapytanie o produkt",
-                "content": "Dzień dobry,\n\nChciałbym zapytać o dostępność produktu XYZ.\n\nPozdrawiam,\nJan Kowalski"
+                "content": "Dzień dobry,\n\nChciałbym zapytać o dostępność produktu XYZ.\n\nPozdrawiam,\nJan Kowalski",
             }
         }
 

@@ -1,14 +1,25 @@
-import os
-import logging
-import aiosqlite
 import json
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, DateTime, Text, select
+import logging
+import os
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import aiosqlite
+from dotenv import load_dotenv
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    Text,
+    create_engine,
+    select,
+)
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from datetime import datetime
-from typing import List, Optional, Dict, Any
-from dotenv import load_dotenv
 
 # Załaduj zmienne środowiskowe
 load_dotenv()
@@ -48,6 +59,7 @@ else:
 # Definicja modelu bazowego
 Base = declarative_base()
 
+
 # Definicja modelu Email
 class EmailTable(Base):
     __tablename__ = "emails"
@@ -62,13 +74,13 @@ class EmailTable(Base):
     tone_analysis = Column(Text)
     status = Column(String(50))
 
+
 # Inicjalizacja silnika bazy danych
 engine = create_async_engine(DATABASE_URL, echo=False)
 
 # Sesja asynchroniczna
-async_session = sessionmaker(
-    engine, expire_on_commit=False, class_=AsyncSession
-)
+async_session = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
 
 # Funkcja inicjalizująca bazę danych
 async def init_db():
@@ -76,7 +88,9 @@ async def init_db():
         async with engine.begin() as conn:
             # Use SQLAlchemy text() for raw SQL
             from sqlalchemy.sql import text
-            create_table_sql = text("""
+
+            create_table_sql = text(
+                """
                 CREATE TABLE IF NOT EXISTS emails (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     from_email TEXT NOT NULL,
@@ -91,57 +105,72 @@ async def init_db():
                     reply_date TEXT,
                     reply_content TEXT
                 )
-            """)
+            """
+            )
             await conn.execute(create_table_sql)
         logger.info("Baza danych zainicjalizowana pomyślnie")
     except Exception as e:
         logger.error(f"Błąd podczas inicjalizacji bazy danych: {str(e)}")
         raise e
 
+
 # Funkcja zwracająca sesję bazy danych
 async def get_db():
     async with async_session() as session:
         yield session
 
+
 # Funkcja pobierająca historię emaili od danego nadawcy
 async def get_email_history(from_email: str) -> List[Dict[str, Any]]:
     async with async_session() as session:
-        query = select(EmailTable).where(EmailTable.from_email == from_email).order_by(EmailTable.received_date.desc())
+        query = (
+            select(EmailTable)
+            .where(EmailTable.from_email == from_email)
+            .order_by(EmailTable.received_date.desc())
+        )
         result = await session.execute(query)
         rows = result.scalars().all()
 
         history = []
         for row in rows:
-            history.append({
-                "id": row.id,
-                "subject": row.subject,
-                "date": row.received_date.isoformat() if row.received_date else "",
-                "sentiment": _extract_sentiment_from_analysis(row.tone_analysis),
-                "status": row.status
-            })
+            history.append(
+                {
+                    "id": row.id,
+                    "subject": row.subject,
+                    "date": row.received_date.isoformat() if row.received_date else "",
+                    "sentiment": _extract_sentiment_from_analysis(row.tone_analysis),
+                    "status": row.status,
+                }
+            )
 
         return history
+
 
 # Funkcja zapisująca email do bazy danych
 async def save_email(email_data: Dict[str, Any]) -> int:
     async with async_session() as session:
         # Konwersja string daty na obiekt datetime jeśli potrzebna
-        if 'received_date' in email_data and isinstance(email_data['received_date'], str):
+        if "received_date" in email_data and isinstance(email_data["received_date"], str):
             try:
-                email_data['received_date'] = datetime.fromisoformat(email_data['received_date'])
+                email_data["received_date"] = datetime.fromisoformat(email_data["received_date"])
             except ValueError:
                 # Jeśli format daty jest niepoprawny, użyj aktualnej daty
-                logger.warning(f"Niepoprawny format daty: {email_data['received_date']}. Używam aktualnej daty.")
-                email_data['received_date'] = datetime.now()
-                
+                logger.warning(
+                    f"Niepoprawny format daty: {email_data['received_date']}. Używam aktualnej daty."
+                )
+                email_data["received_date"] = datetime.now()
+
         new_email = EmailTable(**email_data)
         session.add(new_email)
         await session.commit()
         await session.refresh(new_email)
         return new_email.id
 
+
 # Funkcja aktualizująca status emaila
-async def update_email_status(email_id: int, status: str, tone_analysis: Optional[str] = None) -> bool:
+async def update_email_status(
+    email_id: int, status: str, tone_analysis: Optional[str] = None
+) -> bool:
     async with async_session() as session:
         query = select(EmailTable).where(EmailTable.id == email_id)
         result = await session.execute(query)
@@ -157,6 +186,7 @@ async def update_email_status(email_id: int, status: str, tone_analysis: Optiona
 
         await session.commit()
         return True
+
 
 # Funkcja pomocnicza do ekstrakcji sentymentu z JSON analizy tonu
 def _extract_sentiment_from_analysis(analysis_json: Optional[str]) -> str:

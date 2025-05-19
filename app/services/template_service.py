@@ -1,11 +1,11 @@
-import os
-import logging
 import json
+import logging
+import os
 from pathlib import Path
-from typing import List, Dict, Optional, Any
-from dotenv import load_dotenv
+from typing import Any, Dict, List, Optional
 
-from models import TemplateSchema, TemplateResponse, Sentiment, Urgency
+from dotenv import load_dotenv
+from models import Sentiment, TemplateResponse, TemplateSchema, Urgency
 
 # Załaduj zmienne środowiskowe
 load_dotenv()
@@ -30,7 +30,7 @@ class TemplateService:
                 self.template_dir.mkdir(parents=True, exist_ok=True)
 
             # Sprawdzenie czy są jakieś szablony w katalogu
-            templates = list(self.template_dir.glob('*.template'))
+            templates = list(self.template_dir.glob("*.template"))
             if not templates:
                 logger.info("Brak szablonów, tworzenie domyślnych szablonów")
                 await self._create_default_templates()
@@ -54,7 +54,7 @@ class TemplateService:
             TemplateSchema(
                 key=key,
                 content=content,
-                preview=content[:100] + "..." if len(content) > 100 else content
+                preview=content[:100] + "..." if len(content) > 100 else content,
             )
             for key, content in self.templates.items()
         ]
@@ -72,10 +72,9 @@ class TemplateService:
 
         return TemplateResponse(key=template_key, content=content)
 
-    async def select_template_key(self,
-                                  sentiment: Sentiment,
-                                  urgency: Urgency,
-                                  email_count: int = 0) -> str:
+    async def select_template_key(
+        self, sentiment: Sentiment, urgency: Urgency, email_count: int = 0
+    ) -> str:
         """
         Wybiera odpowiedni klucz szablonu na podstawie analizy i historii komunikacji
         """
@@ -98,15 +97,17 @@ class TemplateService:
         # Domyślny szablon
         return "default"
 
-    async def fill_template(self,
-                            template_key: str,
-                            sender_name: str,
-                            subject: str,
-                            email_count: int = 0,
-                            last_email_date: str = "",
-                            sentiment: Optional[str] = None,
-                            urgency: Optional[str] = None,
-                            summary: Optional[str] = None) -> str:
+    async def fill_template(
+        self,
+        template_key: str,
+        sender_name: str,
+        subject: str,
+        email_count: int = 0,
+        last_email_date: str = "",
+        sentiment: Optional[str] = None,
+        urgency: Optional[str] = None,
+        summary: Optional[str] = None,
+    ) -> str:
         """
         Wypełnia szablon danymi
         """
@@ -114,7 +115,9 @@ class TemplateService:
             await self._load_templates()
 
         # Pobierz szablon lub użyj domyślnego, jeśli określony nie istnieje
-        template = self.templates.get(template_key, self.templates.get("default", self._get_default_template()))
+        template = self.templates.get(
+            template_key, self.templates.get("default", self._get_default_template())
+        )
 
         # Podstawowe zmienne
         template = template.replace("{{SENDER_NAME}}", sender_name)
@@ -145,10 +148,10 @@ class TemplateService:
         """
         self.templates = {}
         try:
-            for template_path in self.template_dir.glob('*.template'):
+            for template_path in self.template_dir.glob("*.template"):
                 try:
                     key = template_path.stem
-                    content = template_path.read_text(encoding='utf-8')
+                    content = template_path.read_text(encoding="utf-8")
                     self.templates[key] = content
                     logger.debug(f"Załadowano szablon: {key}")
                 except Exception as e:
@@ -205,12 +208,12 @@ Skontaktujemy się z Tobą najszybciej jak to możliwe.
 
 Z poważaniem,
 Zespół Obsługi Klienta
-"""
+""",
         }
 
         for key, content in templates.items():
             template_path = self.template_dir / f"{key}.template"
-            template_path.write_text(content, encoding='utf-8')
+            template_path.write_text(content, encoding="utf-8")
             logger.info(f"Utworzono szablon: {key}")
 
     def _get_default_template(self) -> str:
@@ -233,6 +236,7 @@ Zespół Obsługi Klienta
         Zwraca bieżącą datę w formacie polskim
         """
         from datetime import datetime
+
         return datetime.now().strftime("%d.%m.%Y")
 
     def extract_name_from_email(self, email: str) -> str:
@@ -241,21 +245,22 @@ Zespół Obsługi Klienta
         """
         try:
             # Usuń < > jeśli występują w adresie
-            if '<' in email and '>' in email:
+            if "<" in email and ">" in email:
                 # Format "Jan Kowalski <jan@example.com>"
-                name_part = email.split('<')[0].strip()
+                name_part = email.split("<")[0].strip()
                 if name_part:
                     return name_part
                 # Pobierz adres jeśli nie ma nazwy
-                email = email.split('<')[1].split('>')[0]
+                email = email.split("<")[1].split(">")[0]
 
             # Pobierz część przed @
-            name_part = email.split('@')[0]
+            name_part = email.split("@")[0]
 
             # Usuń cyfry i znaki specjalne, zamień _ i . na spacje
             import re
-            name_only = re.sub(r'[0-9_\.]', ' ', name_part)
-            name_only = ' '.join([part.capitalize() for part in name_only.split() if part])
+
+            name_only = re.sub(r"[0-9_\.]", " ", name_part)
+            name_only = " ".join([part.capitalize() for part in name_only.split() if part])
 
             return name_only if name_only else "Klient"
         except Exception:

@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
-import pytest
 import json
 from datetime import datetime
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.services.llm_service import LlmService
+import pytest
+
 from app.models import EmailSchema
+from app.services.llm_service import LlmService
 
 
 @pytest.fixture
@@ -26,7 +27,7 @@ def sample_email():
         to_email="support@fin-officer.com",
         subject="Question about financial services",
         content="Hello,\n\nI am interested in your financial services. Could you please provide more information about your accounting packages for small businesses? I currently have 5 employees and need help with monthly bookkeeping and tax filing.\n\nThank you,\nJohn",
-        received_date="2025-05-20T00:40:00"
+        received_date="2025-05-20T00:40:00",
     )
 
 
@@ -35,23 +36,23 @@ async def test_generate_auto_reply(mock_response, sample_email):
     """Test the generate_auto_reply method"""
     # Arrange
     llm_service = LlmService()
-    
+
     # Mock the API call
-    with patch.object(llm_service, '_call_llm_api_with_mcp', new_callable=AsyncMock) as mock_call_api:
+    with patch.object(
+        llm_service, "_call_llm_api_with_mcp", new_callable=AsyncMock
+    ) as mock_call_api:
         mock_call_api.return_value = mock_response["response"]
-        
+
         # Act
         result = await llm_service.generate_auto_reply(
-            email_content=sample_email.content,
-            sender_name="Test",
-            email_history=[]
+            email_content=sample_email.content, sender_name="Test", email_history=[]
         )
-        
+
         # Assert
         assert "Dziękujemy za zainteresowanie" in result
         assert "Zespół Fin Officer" in result
         assert mock_call_api.called
-        
+
         # Verify that the MCP context was created correctly
         call_args = mock_call_api.call_args[0][0]
         assert "context" in call_args
@@ -68,16 +69,14 @@ async def test_create_mcp_context(sample_email):
     sender_name = "Test"
     email_history = [
         {"from_user": True, "content": "Previous question", "timestamp": "2025-05-19T00:00:00"},
-        {"from_user": False, "content": "Previous answer", "timestamp": "2025-05-19T00:01:00"}
+        {"from_user": False, "content": "Previous answer", "timestamp": "2025-05-19T00:01:00"},
     ]
-    
+
     # Act
     context = llm_service._create_mcp_context(
-        email_content=sample_email.content,
-        sender_name=sender_name,
-        email_history=email_history
+        email_content=sample_email.content, sender_name=sender_name, email_history=email_history
     )
-    
+
     # Assert
     assert context["context"]["sender"]["name"] == sender_name
     assert context["context"]["email"]["content"] == sample_email.content
@@ -95,19 +94,21 @@ async def test_call_llm_api_with_mcp(mock_response):
     mcp_context = {
         "context": {"test": "value"},
         "instructions": ["instruction1", "instruction2"],
-        "output_format": "text"
+        "output_format": "text",
     }
-    
+
     # Mock the aiohttp ClientSession
     mock_session = AsyncMock()
     mock_session.__aenter__.return_value = mock_session
     mock_session.post.return_value.__aenter__.return_value.status = 200
-    mock_session.post.return_value.__aenter__.return_value.json = AsyncMock(return_value=mock_response)
-    
+    mock_session.post.return_value.__aenter__.return_value.json = AsyncMock(
+        return_value=mock_response
+    )
+
     # Act
-    with patch('aiohttp.ClientSession', return_value=mock_session):
+    with patch("aiohttp.ClientSession", return_value=mock_session):
         result = await llm_service._call_llm_api_with_mcp(mcp_context)
-    
+
     # Assert
     assert result == mock_response["response"]
     assert mock_session.post.called
@@ -123,10 +124,10 @@ async def test_default_reply():
     # Arrange
     llm_service = LlmService()
     sender_name = "Test"
-    
+
     # Act
     result = llm_service._create_default_reply(sender_name)
-    
+
     # Assert
     assert sender_name in result
     assert "Dziękujemy za wiadomość" in result

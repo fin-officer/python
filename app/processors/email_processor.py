@@ -1,16 +1,16 @@
-import os
-import logging
 import json
+import logging
+import os
 from datetime import datetime
-from typing import Optional, Dict, Any
 from pathlib import Path
-from dotenv import load_dotenv
+from typing import Any, Dict, Optional
 
-from models import EmailSchema, EmailStatus, Sentiment, Urgency, ToneAnalysis
+from dotenv import load_dotenv
+from models import EmailSchema, EmailStatus, Sentiment, ToneAnalysis, Urgency
+from services.db_service import get_email_history, save_email, update_email_status
 from services.email_service import EmailService
 from services.llm_service import LlmService
 from services.template_service import TemplateService
-from services.db_service import save_email, update_email_status, get_email_history
 
 # Załaduj zmienne środowiskowe
 load_dotenv()
@@ -19,11 +19,11 @@ logger = logging.getLogger("email_processor")
 
 
 async def process_email(
-        email: EmailSchema,
-        email_service: EmailService,
-        llm_service: LlmService,
-        template_service: TemplateService,
-        db=None
+    email: EmailSchema,
+    email_service: EmailService,
+    llm_service: LlmService,
+    template_service: TemplateService,
+    db=None,
 ) -> int:
     """
     Główna funkcja przetwarzająca wiadomość email
@@ -38,7 +38,7 @@ async def process_email(
             "subject": email.subject,
             "content": email.content,
             "received_date": datetime.now(),
-            "status": EmailStatus.RECEIVED.value
+            "status": EmailStatus.RECEIVED.value,
         }
 
         email_id = await save_email(email_dict)
@@ -52,14 +52,16 @@ async def process_email(
         logger.info(f"Analiza tonu zakończona: {tone_analysis.sentiment}, {tone_analysis.urgency}")
 
         # Zapisanie wyników analizy
-        analysis_json = json.dumps({
-            "sentiment": tone_analysis.sentiment.value,
-            "emotions": {k.value: v for k, v in tone_analysis.emotions.items()},
-            "urgency": tone_analysis.urgency.value,
-            "formality": tone_analysis.formality.value,
-            "top_topics": tone_analysis.top_topics,
-            "summary_text": tone_analysis.summary_text
-        })
+        analysis_json = json.dumps(
+            {
+                "sentiment": tone_analysis.sentiment.value,
+                "emotions": {k.value: v for k, v in tone_analysis.emotions.items()},
+                "urgency": tone_analysis.urgency.value,
+                "formality": tone_analysis.formality.value,
+                "top_topics": tone_analysis.top_topics,
+                "summary_text": tone_analysis.summary_text,
+            }
+        )
 
         await update_email_status(email_id, EmailStatus.PROCESSED.value, analysis_json)
 
@@ -75,9 +77,7 @@ async def process_email(
 
             # Wybór odpowiedniego szablonu
             template_key = await template_service.select_template_key(
-                tone_analysis.sentiment,
-                tone_analysis.urgency,
-                len(email_history)
+                tone_analysis.sentiment, tone_analysis.urgency, len(email_history)
             )
 
             # Ekstrakcja imienia z adresu email
@@ -101,22 +101,24 @@ async def process_email(
                 last_email_date=last_email_date,
                 sentiment=translate_sentiment(tone_analysis.sentiment),
                 urgency=translate_urgency(tone_analysis.urgency),
-                summary=tone_analysis.summary_text
+                summary=tone_analysis.summary_text,
             )
 
             # Wysłanie odpowiedzi
-            reply_subject = f"Re: {email.subject}" if email.subject else "Odpowiedź na Twoją wiadomość"
+            reply_subject = (
+                f"Re: {email.subject}" if email.subject else "Odpowiedź na Twoją wiadomość"
+            )
             sent = await email_service.send_email(
-                to_email=email.from_email,
-                subject=reply_subject,
-                content=reply_content
+                to_email=email.from_email, subject=reply_subject, content=reply_content
             )
 
             if sent:
                 await update_email_status(email_id, EmailStatus.REPLIED.value)
                 logger.info(f"Wysłano automatyczną odpowiedź dla wiadomości ID: {email_id}")
             else:
-                logger.error(f"Nie udało się wysłać automatycznej odpowiedzi dla wiadomości ID: {email_id}")
+                logger.error(
+                    f"Nie udało się wysłać automatycznej odpowiedzi dla wiadomości ID: {email_id}"
+                )
 
         return email_id
 
@@ -132,10 +134,10 @@ def should_auto_reply(analysis: ToneAnalysis) -> bool:
     Decyduje, czy należy wysłać automatyczną odpowiedź na podstawie analizy
     """
     # Przykładowa logika decyzji o automatycznej odpowiedzi
-    return (
-            analysis.urgency in [Urgency.HIGH, Urgency.CRITICAL] or
-            analysis.sentiment in [Sentiment.NEGATIVE, Sentiment.VERY_NEGATIVE]
-    )
+    return analysis.urgency in [Urgency.HIGH, Urgency.CRITICAL] or analysis.sentiment in [
+        Sentiment.NEGATIVE,
+        Sentiment.VERY_NEGATIVE,
+    ]
 
 
 async def archive_email(email: EmailSchema, analysis: Optional[ToneAnalysis] = None) -> bool:
@@ -191,7 +193,7 @@ def translate_sentiment(sentiment: Sentiment) -> str:
         Sentiment.NEGATIVE: "negatywna",
         Sentiment.NEUTRAL: "neutralna",
         Sentiment.POSITIVE: "pozytywna",
-        Sentiment.VERY_POSITIVE: "bardzo pozytywna"
+        Sentiment.VERY_POSITIVE: "bardzo pozytywna",
     }
     return translations.get(sentiment, "neutralna")
 
@@ -204,6 +206,6 @@ def translate_urgency(urgency: Urgency) -> str:
         Urgency.CRITICAL: "krytyczna",
         Urgency.HIGH: "wysoka",
         Urgency.NORMAL: "normalna",
-        Urgency.LOW: "niska"
+        Urgency.LOW: "niska",
     }
     return translations.get(urgency, "normalna")

@@ -1,19 +1,19 @@
-from fastapi import FastAPI, Depends, BackgroundTasks, HTTPException, Query
+import asyncio
+import logging
+import os
+from datetime import datetime
+
+from dotenv import load_dotenv
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
-from dotenv import load_dotenv
-import os
-import logging
-from datetime import datetime
-import asyncio
-from sqlalchemy import text, select
-
-from models import EmailSchema, EmailResponse, TemplateListResponse, TemplateResponse
+from models import EmailResponse, EmailSchema, TemplateListResponse, TemplateResponse
+from processors.email_processor import archive_email, process_email
+from services.db_service import EmailTable, get_db, get_email_history, init_db
 from services.email_service import EmailService
 from services.llm_service import LlmService
 from services.template_service import TemplateService
-from services.db_service import get_db, init_db, EmailTable, get_email_history
-from processors.email_processor import process_email, archive_email
+from sqlalchemy import select, text
 
 # Załaduj zmienne środowiskowe
 load_dotenv()
@@ -22,9 +22,7 @@ load_dotenv()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler()
-    ]
+    handlers=[logging.StreamHandler()],
 )
 
 logger = logging.getLogger(__name__)
@@ -38,7 +36,7 @@ template_service = TemplateService()
 app = FastAPI(
     title="Email LLM Processor",
     description="Aplikacja do przetwarzania wiadomości email z wykorzystaniem LLM",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # Konfiguracja CORS
@@ -49,6 +47,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Zdarzenie startowe aplikacji
 @app.on_event("startup")
@@ -62,11 +61,11 @@ async def fetch_emails_task():
     try:
         emails = await email_service.fetch_emails()
         logger.info(f"Pobrano {len(emails)} wiadomości email")
-        
+
         for email in emails:
             # Przetwarzanie emaila w tle
             await process_email(email)
-            
+
     except Exception as e:
         logger.error(f"Błąd podczas pobierania wiadomości email: {str(e)}")
 
@@ -74,27 +73,28 @@ async def fetch_emails_task():
 # Endpoint do ręcznego przetwarzania wiadomości
 @app.post("/api/emails/process", response_model=EmailResponse)
 async def process_email_endpoint(
-        email: EmailSchema,
-        background_tasks: BackgroundTasks,
-        db=Depends(get_db)
+    email: EmailSchema, background_tasks: BackgroundTasks, db=Depends(get_db)
 ):
     try:
         # Zapisanie emaila do bazy danych
-        email_id = await save_email({
-            "from_email": email.from_email,
-            "to_email": email.to_email,
-            "subject": email.subject,
-            "content": email.content,
-            "received_date": email.received_date
-        })
-        
-        # Przetwarzanie emaila w tle
-        background_tasks.add_task(
-            process_email,
-            email
+        email_id = await save_email(
+            {
+                "from_email": email.from_email,
+                "to_email": email.to_email,
+                "subject": email.subject,
+                "content": email.content,
+                "received_date": email.received_date,
+            }
         )
-        
-        return {"id": email_id, "status": "PROCESSING", "message": "Wiadomość przyjęta do przetworzenia"}
+
+        # Przetwarzanie emaila w tle
+        background_tasks.add_task(process_email, email)
+
+        return {
+            "id": email_id,
+            "status": "PROCESSING",
+            "message": "Wiadomość przyjęta do przetworzenia",
+        }
     except Exception as e:
         logger.error(f"Błąd podczas przetwarzania wiadomości: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -140,7 +140,7 @@ async def health_check():
     return {
         "status": "UP" if all_up else "DEGRADED",
         "timestamp": datetime.now().isoformat(),
-        "services": services_status
+        "services": services_status,
     }
 
 
@@ -151,7 +151,7 @@ async def send_test_email(to_email: str = Query(..., description="Adres email od
         content = "To jest testowa wiadomość wygenerowana przez Email LLM Processor."
         subject = "Test Email LLM Processor"
         result = await email_service.send_email(to_email, subject, content)
-        
+
         if result:
             return {"status": "success", "message": f"Testowa wiadomość wysłana do {to_email}"}
         else:
@@ -166,10 +166,8 @@ async def send_test_email(to_email: str = Query(..., description="Adres email od
 async def fetch_emails_endpoint(background_tasks: BackgroundTasks):
     try:
         # Pobieranie emaili w tle
-        background_tasks.add_task(
-            fetch_emails_task
-        )
-        
+        background_tasks.add_task(fetch_emails_task)
+
         return {"status": "success", "message": "Rozpoczęto pobieranie wiadomości email"}
     except Exception as e:
         logger.error(f"Błąd podczas pobierania wiadomości: {str(e)}")
@@ -179,19 +177,17 @@ async def fetch_emails_endpoint(background_tasks: BackgroundTasks):
 # Endpoint do automatycznego odpowiadania na wiadomości email z użyciem MCP
 @app.post("/api/emails/{email_id}/auto-reply")
 async def auto_reply_to_email_endpoint(
-        email_id: int,
-        background_tasks: BackgroundTasks = None,
-        db=Depends(get_db)
+    email_id: int, background_tasks: BackgroundTasks = None, db=Depends(get_db)
 ):
     try:
         # Pobranie wiadomości z bazy danych używając SQLAlchemy ORM
         query = select(EmailTable).where(EmailTable.id == email_id)
         result = await db.execute(query)
         email_record = result.scalars().first()
-        
+
         if not email_record:
             raise HTTPException(status_code=404, detail="Wiadomość nie znaleziona")
-            
+
         # Konwersja rekordu na obiekt EmailSchema
         original_email = EmailSchema(
             id=email_record.id,
@@ -199,50 +195,60 @@ async def auto_reply_to_email_endpoint(
             to_email=email_record.to_email,
             subject=email_record.subject,
             content=email_record.content,
-            received_date=email_record.received_date
+            received_date=email_record.received_date,
         )
-        
+
         # Pobranie historii wiadomości od tego nadawcy
         email_history = await get_email_history(original_email.from_email)
-        
+
         # Przygotowanie historii wiadomości w formacie dla MCP
         mcp_email_history = []
         for email in email_history:
-            mcp_email_history.append({
-                "from_user": True,  # Wiadomości od użytkownika
-                "content": email.get("content", ""),
-                "timestamp": email.get("received_date", "")
-            })
+            mcp_email_history.append(
+                {
+                    "from_user": True,  # Wiadomości od użytkownika
+                    "content": email.get("content", ""),
+                    "timestamp": email.get("received_date", ""),
+                }
+            )
             if email.get("reply_content"):
-                mcp_email_history.append({
-                    "from_user": False,  # Nasze odpowiedzi
-                    "content": email.get("reply_content", ""),
-                    "timestamp": email.get("reply_date", "")
-                })
-        
+                mcp_email_history.append(
+                    {
+                        "from_user": False,  # Nasze odpowiedzi
+                        "content": email.get("reply_content", ""),
+                        "timestamp": email.get("reply_date", ""),
+                    }
+                )
+
         # Ekstrakcja nazwy nadawcy z adresu email
         sender_name = original_email.from_email.split("@")[0]
-        
+
         # Generowanie automatycznej odpowiedzi
         auto_reply_content = await llm_service.generate_auto_reply(
             email_content=original_email.content,
             sender_name=sender_name,
-            email_history=mcp_email_history
+            email_history=mcp_email_history,
         )
-        
+
         # Wysyłanie odpowiedzi w tle jeśli podano background_tasks
         if background_tasks:
             background_tasks.add_task(
                 email_service.reply_to_email,
                 original_email,
                 original_email.subject,
-                auto_reply_content
+                auto_reply_content,
             )
-            return {"status": "success", "message": f"Automatyczna odpowiedź do {original_email.from_email} zostanie wysłana w tle", "content": auto_reply_content}
-        
+            return {
+                "status": "success",
+                "message": f"Automatyczna odpowiedź do {original_email.from_email} zostanie wysłana w tle",
+                "content": auto_reply_content,
+            }
+
         # Wysyłanie odpowiedzi synchronicznie
-        result = await email_service.reply_to_email(original_email, original_email.subject, auto_reply_content)
-        
+        result = await email_service.reply_to_email(
+            original_email, original_email.subject, auto_reply_content
+        )
+
         if result:
             # Aktualizacja statusu wiadomości w bazie danych
             update_stmt = text(
@@ -253,14 +259,20 @@ async def auto_reply_to_email_endpoint(
                 {
                     "id": email_id,
                     "reply_date": datetime.now().isoformat(),
-                    "reply_content": auto_reply_content
-                }
+                    "reply_content": auto_reply_content,
+                },
             )
-            
-            return {"status": "success", "message": f"Automatyczna odpowiedź wysłana do {original_email.from_email}", "content": auto_reply_content}
+
+            return {
+                "status": "success",
+                "message": f"Automatyczna odpowiedź wysłana do {original_email.from_email}",
+                "content": auto_reply_content,
+            }
         else:
-            raise HTTPException(status_code=500, detail="Błąd podczas wysyłania automatycznej odpowiedzi")
-            
+            raise HTTPException(
+                status_code=500, detail="Błąd podczas wysyłania automatycznej odpowiedzi"
+            )
+
     except HTTPException as he:
         raise he
     except Exception as e:
@@ -271,20 +283,20 @@ async def auto_reply_to_email_endpoint(
 # Endpoint do odpowiadania na wiadomości email
 @app.post("/api/emails/{email_id}/reply")
 async def reply_to_email_endpoint(
-        email_id: int,
-        content: str = Query(..., description="Treść odpowiedzi"),
-        background_tasks: BackgroundTasks = None,
-        db=Depends(get_db)
+    email_id: int,
+    content: str = Query(..., description="Treść odpowiedzi"),
+    background_tasks: BackgroundTasks = None,
+    db=Depends(get_db),
 ):
     try:
         # Pobranie wiadomości z bazy danych używając SQLAlchemy ORM
         query = select(EmailTable).where(EmailTable.id == email_id)
         result = await db.execute(query)
         email_record = result.scalars().first()
-        
+
         if not email_record:
             raise HTTPException(status_code=404, detail="Wiadomość nie znaleziona")
-            
+
         # Konwersja rekordu na obiekt EmailSchema
         original_email = EmailSchema(
             id=email_record.id,
@@ -292,22 +304,22 @@ async def reply_to_email_endpoint(
             to_email=email_record.to_email,
             subject=email_record.subject,
             content=email_record.content,
-            received_date=email_record.received_date
+            received_date=email_record.received_date,
         )
-        
+
         # Wysyłanie odpowiedzi w tle jeśli podano background_tasks
         if background_tasks:
             background_tasks.add_task(
-                email_service.reply_to_email,
-                original_email,
-                original_email.subject,
-                content
+                email_service.reply_to_email, original_email, original_email.subject, content
             )
-            return {"status": "success", "message": f"Odpowiedź do {original_email.from_email} zostanie wysłana w tle"}
-        
+            return {
+                "status": "success",
+                "message": f"Odpowiedź do {original_email.from_email} zostanie wysłana w tle",
+            }
+
         # Wysyłanie odpowiedzi synchronicznie
         result = await email_service.reply_to_email(original_email, original_email.subject, content)
-        
+
         if result:
             # Aktualizacja statusu wiadomości w bazie danych
             update_stmt = text(
@@ -318,14 +330,17 @@ async def reply_to_email_endpoint(
                 {
                     "id": email_id,
                     "reply_date": datetime.now().isoformat(),
-                    "reply_content": content
-                }
+                    "reply_content": content,
+                },
             )
-            
-            return {"status": "success", "message": f"Odpowiedź wysłana do {original_email.from_email}"}
+
+            return {
+                "status": "success",
+                "message": f"Odpowiedź wysłana do {original_email.from_email}",
+            }
         else:
             raise HTTPException(status_code=500, detail="Błąd podczas wysyłania odpowiedzi")
-            
+
     except HTTPException as he:
         raise he
     except Exception as e:
