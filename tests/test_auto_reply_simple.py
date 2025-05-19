@@ -31,14 +31,12 @@ async def test_generate_auto_reply():
     llm_service = LlmService()
     email_content = "Hello, I have a question about your services."
     sender_name = "Test"
-    
+
     # Act
     result = await llm_service.generate_auto_reply(
-        email_content=email_content, 
-        sender_name=sender_name, 
-        email_history=[]
+        email_content=email_content, sender_name=sender_name, email_history=[]
     )
-    
+
     # Assert
     assert result is not None
     assert sender_name in result
@@ -52,14 +50,12 @@ async def test_create_mcp_context():
     llm_service = LlmService()
     email_content = "Hello, I have a question about your services."
     sender_name = "Test"
-    
+
     # Act
     context = llm_service._create_mcp_context(
-        email_content=email_content,
-        sender_name=sender_name,
-        email_history=[]
+        email_content=email_content, sender_name=sender_name, email_history=[]
     )
-    
+
     # Assert
     assert context is not None
     assert "context" in context

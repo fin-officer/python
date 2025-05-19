@@ -75,10 +75,14 @@ class LlmService:
         self.api_url = "http://localhost:11434"
         self.model = "llama2"
 
-    async def generate_auto_reply(self, email_content: str, sender_name: str, email_history: list = None) -> str:
+    async def generate_auto_reply(
+        self, email_content: str, sender_name: str, email_history: list = None
+    ) -> str:
         return f"Auto-reply to {sender_name}: Thank you for your message."
 
-    def _create_mcp_context(self, email_content: str, sender_name: str, email_history: list = None) -> dict:
+    def _create_mcp_context(
+        self, email_content: str, sender_name: str, email_history: list = None
+    ) -> dict:
         return {
             "context": {
                 "service": "Usługi finansowe i księgowe",

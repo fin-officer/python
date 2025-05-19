@@ -6,7 +6,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from tests.mocks import EmailSchema, Emotion, Formality, LlmService, Sentiment, ToneAnalysis, Urgency
+from tests.mocks import (
+    EmailSchema,
+    Emotion,
+    Formality,
+    LlmService,
+    Sentiment,
+    ToneAnalysis,
+    Urgency,
+)
 
 
 @pytest.fixture
