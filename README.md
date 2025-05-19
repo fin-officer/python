@@ -145,6 +145,40 @@ FastAPI automatycznie generuje dokumentację Swagger dostępną pod adresem http
 - **GET /health** - Sprawdzenie stanu aplikacji
 - **POST /api/emails/send-test** - Wysłanie testowej wiadomości
 
+## Automatyczne odpowiedzi z użyciem MCP
+
+System obsługuje automatyczne generowanie odpowiedzi na wiadomości email przy użyciu protokołu MCP (Model Context Protocol) dla modelu TinyLLM z Ollama. Funkcjonalność ta pozwala na:
+
+1. **Inteligentne odpowiedzi**: System analizuje treść wiadomości i generuje odpowiednie odpowiedzi
+2. **Kontekstowe zrozumienie**: Wykorzystuje historię konwersacji do tworzenia spójnych odpowiedzi
+3. **Personalizacja**: Dostosowuje ton i treść odpowiedzi do nadawcy
+
+Aby użyć funkcji automatycznej odpowiedzi, wywołaj endpoint:
+
+```
+POST /api/emails/{email_id}/auto-reply
+```
+
+System pobierze wiadomość, wygeneruje odpowiedź przy użyciu MCP i wyśle ją do nadawcy.
+
+## Testowanie
+
+Projekt zawiera kompleksowy framework do testowania i zapewnienia jakości kodu. Szczegółowe informacje znajdują się w pliku [TESTING.md](TESTING.md).
+
+Główne narzędzia testowe:
+
+- **Tox**: Do uruchamiania testów w izolowanych środowiskach
+- **Pytest**: Do testów jednostkowych
+- **Black**: Do formatowania kodu
+- **Flake8/Pylint**: Do analizy statycznej kodu
+- **GitHub Actions**: Do ciągłej integracji
+
+Aby uruchomić wszystkie testy:
+
+```bash
+tox
+```
+
 ## Dostosowanie Systemu
 
 ### Dodawanie nowych funkcjonalności

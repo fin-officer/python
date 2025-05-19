@@ -12,7 +12,7 @@ from models import EmailSchema, EmailResponse, TemplateListResponse, TemplateRes
 from services.email_service import EmailService
 from services.llm_service import LlmService
 from services.template_service import TemplateService
-from services.db_service import get_db, init_db, EmailTable, get_email_history
+from services.db_service import get_db, init_db, EmailTable, get_email_history, save_email
 from processors.email_processor import process_email, archive_email
 
 # Załaduj zmienne środowiskowe
@@ -199,7 +199,7 @@ async def auto_reply_to_email_endpoint(
             to_email=email_record.to_email,
             subject=email_record.subject,
             content=email_record.content,
-            received_date=email_record.received_date
+            received_date=str(email_record.received_date) if email_record.received_date else None
         )
         
         # Pobranie historii wiadomości od tego nadawcy
@@ -292,7 +292,7 @@ async def reply_to_email_endpoint(
             to_email=email_record.to_email,
             subject=email_record.subject,
             content=email_record.content,
-            received_date=email_record.received_date
+            received_date=str(email_record.received_date) if email_record.received_date else None
         )
         
         # Wysyłanie odpowiedzi w tle jeśli podano background_tasks

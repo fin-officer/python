@@ -125,6 +125,15 @@ async def get_email_history(from_email: str) -> List[Dict[str, Any]]:
 # Funkcja zapisująca email do bazy danych
 async def save_email(email_data: Dict[str, Any]) -> int:
     async with async_session() as session:
+        # Konwersja string daty na obiekt datetime jeśli potrzebna
+        if 'received_date' in email_data and isinstance(email_data['received_date'], str):
+            try:
+                email_data['received_date'] = datetime.fromisoformat(email_data['received_date'])
+            except ValueError:
+                # Jeśli format daty jest niepoprawny, użyj aktualnej daty
+                logger.warning(f"Niepoprawny format daty: {email_data['received_date']}. Używam aktualnej daty.")
+                email_data['received_date'] = datetime.now()
+                
         new_email = EmailTable(**email_data)
         session.add(new_email)
         await session.commit()

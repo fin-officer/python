@@ -52,6 +52,8 @@ class EmailSchema(BaseModel):
     to_email: EmailStr
     subject: Optional[str] = None
     content: str
+    received_date: Optional[str] = None
+    id: Optional[int] = None
 
     class Config:
         json_schema_extra = {
