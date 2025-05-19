@@ -1,0 +1,11 @@
+
+Szanowny/a {{SENDER_NAME}},
+
+Dziękujemy za Twoją wiadomość dotyczącą: "{{SUBJECT}}".
+
+Doceniamy Twoją lojalność i częsty kontakt z nami. Jako nasz stały klient, Twoja sprawa zostanie rozpatrzona priorytetowo.
+
+To już Twoja {{EMAIL_COUNT}}. wiadomość do nas. Ostatnio kontaktowałeś/aś się z nami {{LAST_EMAIL_DATE}}.
+
+Z poważaniem,
+Zespół Obsługi Klienta

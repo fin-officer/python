@@ -16,12 +16,34 @@ load_dotenv()
 logger = logging.getLogger("db_service")
 
 # Konfiguracja bazy danych
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:////data/emails.db")  # Use absolute path with 4 slashes
+# Use a simple path in the current directory for testing
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:////app/emails.db")
+
+# Print debugging information
+logger.info(f"Using database URL: {DATABASE_URL}")
+db_path = DATABASE_URL.replace("sqlite:///", "").replace("sqlite+aiosqlite:///", "")
+logger.info(f"Database file path: {db_path}")
+
+# Convert SQLite URL to async version
 if DATABASE_URL.startswith("sqlite:"):
     DATABASE_URL = DATABASE_URL.replace("sqlite:", "sqlite+aiosqlite:")
-    
-# Ensure data directory exists
-os.makedirs(os.path.dirname(DATABASE_URL.replace("sqlite+aiosqlite://", "")), exist_ok=True)
+
+# Ensure parent directory exists
+db_dir = os.path.dirname(db_path)
+logger.info(f"Creating directory if needed: {db_dir}")
+os.makedirs(db_dir, exist_ok=True)
+
+# Check if directory is writable
+if os.access(db_dir, os.W_OK):
+    logger.info(f"Directory {db_dir} is writable")
+else:
+    logger.error(f"Directory {db_dir} is NOT writable")
+    # Try to make it writable
+    try:
+        os.chmod(db_dir, 0o777)
+        logger.info(f"Changed permissions on {db_dir}")
+    except Exception as e:
+        logger.error(f"Failed to change permissions: {str(e)}")
 
 # Definicja modelu bazowego
 Base = declarative_base()
