@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 import aiohttp
 from dotenv import load_dotenv
-from models import Emotion, Formality, Sentiment, ToneAnalysis, Urgency
+from app.models import Emotion, Formality, Sentiment, ToneAnalysis, Urgency
 
 # Załaduj zmienne środowiskowe
 load_dotenv()

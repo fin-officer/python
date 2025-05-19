@@ -18,6 +18,7 @@ setup(
         "requests",
         "aiohttp",
         "httpx",
+        "typing-inspect",
     ],
     extras_require={
         "dev": [
