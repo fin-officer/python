@@ -1,0 +1,23 @@
+---
+# Main playbook that includes all email testing playbooks
+- name: Run all email tests
+  hosts: localhost
+  gather_facts: yes
+  
+  tasks:
+    - name: Display test information
+      debug:
+        msg: |
+          Running Email LLM Processor tests
+          ================================
+          These tests will verify the functionality of the Email LLM Processor application
+          including email sending, receiving, and processing capabilities.
+
+    - name: Include basic email functionality tests
+      import_playbook: email_tests.yml
+
+    - name: Include email service tests
+      import_playbook: email_service_tests.yml
+
+    - name: Include email scenario tests
+      import_playbook: email_scenarios_tests.yml

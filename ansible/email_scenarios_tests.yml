@@ -1,0 +1,127 @@
+---
+# Playbook to test various email scenarios for the Email LLM Processor application
+- name: Test Email Scenarios
+  hosts: localhost
+  gather_facts: yes
+  vars:
+    api_base_url: "http://localhost:8000"
+    mailhog_url: "http://localhost:8025"
+    test_email: "user@example.com"
+  
+  tasks:
+    - name: Test Scenario 1 - Standard Email
+      block:
+        - name: Send standard email for processing
+          uri:
+            url: "{{ api_base_url }}/api/emails/process"
+            method: POST
+            body_format: json
+            body:
+              from_email: "regular@example.com"
+              to_email: "{{ test_email }}"
+              subject: "Regular inquiry"
+              content: "Hello, I have a general question about your services. Could you provide more information?"
+            status_code: 200
+          register: standard_email_result
+          ignore_errors: yes
+
+        - name: Display standard email result
+          debug:
+            var: standard_email_result
+      tags: [standard_email]
+
+    - name: Test Scenario 2 - Urgent Email
+      block:
+        - name: Send urgent email for processing
+          uri:
+            url: "{{ api_base_url }}/api/emails/process"
+            method: POST
+            body_format: json
+            body:
+              from_email: "urgent@example.com"
+              to_email: "{{ test_email }}"
+              subject: "URGENT: Critical Issue"
+              content: "We have a critical issue that needs immediate attention! Our system is down and we need help ASAP!"
+            status_code: 200
+          register: urgent_email_result
+          ignore_errors: yes
+
+        - name: Display urgent email result
+          debug:
+            var: urgent_email_result
+      tags: [urgent_email]
+
+    - name: Test Scenario 3 - Negative Feedback Email
+      block:
+        - name: Send negative feedback email for processing
+          uri:
+            url: "{{ api_base_url }}/api/emails/process"
+            method: POST
+            body_format: json
+            body:
+              from_email: "unhappy@example.com"
+              to_email: "{{ test_email }}"
+              subject: "Complaint about service"
+              content: "I am very disappointed with the service I received. This is the second time I've had issues and I'm considering taking my business elsewhere."
+            status_code: 200
+          register: negative_email_result
+          ignore_errors: yes
+
+        - name: Display negative email result
+          debug:
+            var: negative_email_result
+      tags: [negative_email]
+
+    - name: Test Scenario 4 - Frequent Sender
+      block:
+        - name: Send multiple emails from same sender
+          uri:
+            url: "{{ api_base_url }}/api/emails/process"
+            method: POST
+            body_format: json
+            body:
+              from_email: "frequent@example.com"
+              to_email: "{{ test_email }}"
+              subject: "Question {{ item }}"
+              content: "This is email number {{ item }} from a frequent sender."
+            status_code: 200
+          register: frequent_email_result
+          ignore_errors: yes
+          with_sequence: start=1 end=3
+
+        - name: Display frequent sender results
+          debug:
+            var: frequent_email_result
+      tags: [frequent_sender]
+
+    - name: Test Scenario 5 - Email with Attachments (Simulated)
+      block:
+        - name: Simulate email with attachment reference
+          uri:
+            url: "{{ api_base_url }}/api/emails/process"
+            method: POST
+            body_format: json
+            body:
+              from_email: "attachment@example.com"
+              to_email: "{{ test_email }}"
+              subject: "Document for review"
+              content: "Please find attached the document for your review. [ATTACHMENT: document.pdf]"
+              has_attachments: true
+            status_code: 200
+          register: attachment_email_result
+          ignore_errors: yes
+
+        - name: Display attachment email result
+          debug:
+            var: attachment_email_result
+      tags: [attachment_email]
+
+    - name: Summary of scenario test results
+      debug:
+        msg: |
+          Email Scenario Test Results:
+          - Standard Email: {{ 'PASSED' if standard_email_result.status == 200 else 'FAILED' }}
+          - Urgent Email: {{ 'PASSED' if urgent_email_result.status == 200 else 'FAILED' }}
+          - Negative Feedback: {{ 'PASSED' if negative_email_result.status == 200 else 'FAILED' }}
+          - Frequent Sender: {{ 'PASSED' if frequent_email_result.status == 200 else 'FAILED' }}
+          - Email with Attachments: {{ 'PASSED' if attachment_email_result.status == 200 else 'FAILED' }}

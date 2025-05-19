@@ -1,0 +1,116 @@
+---
+# Playbook to test the email service functionality in isolation
+- name: Test Email Service
+  hosts: localhost
+  gather_facts: yes
+  vars:
+    api_base_url: "http://localhost:8000"
+    mailhog_api_url: "http://localhost:8025/api/v2"
+    test_email: "user@example.com"
+    smtp_host: "mailhog"
+    smtp_port: 1025
+  
+  tasks:
+    - name: Check if MailHog is running
+      uri:
+        url: "{{ mailhog_api_url }}/messages"
+        method: GET
+        status_code: 200
+      register: mailhog_check
+      ignore_errors: yes
+
+    - name: Display MailHog status
+      debug:
+        msg: "MailHog is {{ 'running' if mailhog_check.status == 200 else 'not running' }}"
+
+    - name: Test email service connection
+      uri:
+        url: "{{ api_base_url }}/health"
+        method: GET
+        status_code: 200
+      register: health_check
+      ignore_errors: yes
+
+    - name: Extract email service status from health check
+      set_fact:
+        email_service_status: "{{ health_check.json.services.email_service }}"
+      when: health_check.status is defined and health_check.status == 200
+
+    - name: Display email service status
+      debug:
+        var: email_service_status
+      when: email_service_status is defined
+
+    - name: Send test email via API
+      uri:
+        url: "{{ api_base_url }}/api/emails/send-test?to_email={{ test_email }}"
+        method: POST
+        status_code: 200
+      register: send_email_result
+      ignore_errors: yes
+      when: email_service_status is defined and email_service_status == "UP"
+
+    - name: Wait for email to be delivered (5 seconds)
+      pause:
+        seconds: 5
+      when: send_email_result is defined and send_email_result.status == 200
+
+    - name: Check MailHog for received email
+      uri:
+        url: "{{ mailhog_api_url }}/search?kind=to&query={{ test_email | urlencode }}"
+        method: GET
+        return_content: yes
+      register: mailhog_search
+      ignore_errors: yes
+      when: send_email_result is defined and send_email_result.status == 200
+
+    - name: Display received emails
+      debug:
+        var: mailhog_search
+      when: mailhog_search is defined and mailhog_search.status == 200
+
+    - name: Verify email delivery
+      assert:
+        that:
+          - mailhog_search.status == 200
+          - mailhog_search.json.count > 0
+        fail_msg: "Test email was not delivered to MailHog"
+        success_msg: "Test email was successfully delivered to MailHog"
+      ignore_errors: yes
+      when: mailhog_search is defined
+
+    - name: Test email fetch functionality (simulated)
+      block:
+        - name: Create test email in MailHog
+          uri:
+            url: "{{ api_base_url }}/api/emails/send-test?to_email={{ test_email }}"
+            method: POST
+            status_code: 200
+          register: create_test_email
+          ignore_errors: yes
+
+        - name: Wait for email processing (5 seconds)
+          pause:
+            seconds: 5
+          when: create_test_email.status == 200
+
+        - name: Trigger email fetch manually
+          uri:
+            url: "{{ api_base_url }}/api/emails/fetch"
+            method: POST
+            status_code: 200
+          register: fetch_result
+          ignore_errors: yes
+          when: create_test_email.status == 200
+      when: email_service_status is defined and email_service_status == "UP"
+      ignore_errors: yes
+
+    - name: Summary of email service tests
+      debug:
+        msg: |
+          Email Service Test Results:
+          - MailHog Status: {{ 'RUNNING' if mailhog_check.status == 200 else 'NOT RUNNING' }}
+          - Email Service Status: {{ email_service_status | default('UNKNOWN') }}
+          - Send Test Email: {{ 'PASSED' if send_email_result.status == 200 else 'FAILED' }}
+          - Email Delivery Verification: {{ 'PASSED' if mailhog_search.status == 200 and mailhog_search.json.count > 0 else 'FAILED' }}
+          - Email Fetch Functionality: {{ 'PASSED' if fetch_result.status == 200 else 'NOT TESTED or FAILED' }}

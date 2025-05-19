@@ -1,0 +1,109 @@
+---
+# Playbook to test email functionality of the Email LLM Processor application
+- name: Test Email Functionality
+  hosts: localhost
+  gather_facts: yes
+  vars:
+    api_base_url: "http://localhost:8000"
+    mailhog_url: "http://localhost:8025"
+    test_email: "user@example.com"
+    test_subject: "Test Email from Ansible"
+    test_content: "This is a test email sent by Ansible to verify the Email LLM Processor functionality."
+  
+  tasks:
+    - name: Check if application is running
+      uri:
+        url: "{{ api_base_url }}/health"
+        method: GET
+        status_code: 200
+      register: health_check
+      ignore_errors: yes
+
+    - name: Display health check result
+      debug:
+        var: health_check
+      when: health_check is defined
+
+    - name: Fail if application is not running
+      fail:
+        msg: "The Email LLM Processor application is not running or not accessible"
+      when: health_check.status is not defined or health_check.status != 200
+
+    - name: Send test email via API
+      uri:
+        url: "{{ api_base_url }}/api/emails/send-test?to_email={{ test_email }}"
+        method: POST
+        status_code: 200
+      register: send_email_result
+      ignore_errors: yes
+
+    - name: Display send email result
+      debug:
+        var: send_email_result
+
+    - name: Wait for email to be processed (5 seconds)
+      pause:
+        seconds: 5
+
+    - name: Check MailHog for received email
+      uri:
+        url: "{{ mailhog_url }}/api/v2/messages"
+        method: GET
+        return_content: yes
+      register: mailhog_messages
+      ignore_errors: yes
+
+    - name: Display MailHog messages
+      debug:
+        var: mailhog_messages
+      when: mailhog_messages is defined and mailhog_messages.status == 200
+
+    - name: Verify email was received
+      assert:
+        that:
+          - mailhog_messages.status == 200
+          - mailhog_messages.json.total > 0
+        fail_msg: "No emails were found in MailHog"
+        success_msg: "Successfully verified email delivery"
+      ignore_errors: yes
+
+    - name: Process a test email manually
+      uri:
+        url: "{{ api_base_url }}/api/emails/process"
+        method: POST
+        body_format: json
+        body:
+          from_email: "sender@example.com"
+          to_email: "{{ test_email }}"
+          subject: "{{ test_subject }}"
+          content: "{{ test_content }}"
+        status_code: 200
+      register: process_email_result
+      ignore_errors: yes
+
+    - name: Display process email result
+      debug:
+        var: process_email_result
+
+    - name: Check templates endpoint
+      uri:
+        url: "{{ api_base_url }}/api/templates"
+        method: GET
+        status_code: 200
+      register: templates_result
+      ignore_errors: yes
+
+    - name: Display available templates
+      debug:
+        var: templates_result
+      when: templates_result is defined and templates_result.status == 200
+
+    - name: Summary of test results
+      debug:
+        msg: |
+          Email Functionality Test Results:
+          - Application Health Check: {{ 'PASSED' if health_check.status == 200 else 'FAILED' }}
+          - Send Test Email: {{ 'PASSED' if send_email_result.status == 200 else 'FAILED' }}
+          - Email Received in MailHog: {{ 'PASSED' if mailhog_messages.status == 200 and mailhog_messages.json.total > 0 else 'FAILED' }}
+          - Process Email Manually: {{ 'PASSED' if process_email_result.status == 200 else 'FAILED' }}
+          - Templates API: {{ 'PASSED' if templates_result.status == 200 else 'FAILED' }}
