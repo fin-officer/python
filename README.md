@@ -137,6 +137,9 @@ FastAPI automatycznie generuje dokumentację Swagger dostępną pod adresem http
 ### Główne Endpointy:
 
 - **POST /api/emails/process** - Ręczne przetwarzanie wiadomości
+- **POST /api/emails/{email_id}/reply** - Odpowiadanie na wiadomość email
+- **POST /api/emails/{email_id}/auto-reply** - Automatyczne odpowiadanie na wiadomość email z użyciem MCP
+- **POST /api/emails/fetch** - Ręczne pobieranie wiadomości email
 - **GET /api/templates** - Pobieranie listy dostępnych szablonów
 - **GET /api/templates/{key}** - Pobieranie konkretnego szablonu
 - **GET /health** - Sprawdzenie stanu aplikacji

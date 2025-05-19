@@ -130,18 +130,188 @@ async def health_check():
     }
 
 
-# Endpoint do wysyłania testowej wiadomości email
+# Endpoint do wysłania testowej wiadomości email
 @app.post("/api/emails/send-test")
 async def send_test_email(to_email: str = Query(..., description="Adres email odbiorcy")):
     try:
-        await email_service.send_email(
-            to_email=to_email,
-            subject="Test Email LLM Processor",
-            content="To jest testowa wiadomość z Email LLM Processor."
-        )
-        return {"status": "success", "message": f"Testowa wiadomość wysłana do {to_email}"}
+        content = "To jest testowa wiadomość wygenerowana przez Email LLM Processor."
+        subject = "Test Email LLM Processor"
+        result = await email_service.send_email(to_email, subject, content)
+        
+        if result:
+            return {"status": "success", "message": f"Testowa wiadomość wysłana do {to_email}"}
+        else:
+            raise HTTPException(status_code=500, detail="Błąd podczas wysyłania wiadomości")
     except Exception as e:
         logger.error(f"Błąd podczas wysyłania testowej wiadomości: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Endpoint do ręcznego pobierania wiadomości email
+@app.post("/api/emails/fetch")
+async def fetch_emails_endpoint(background_tasks: BackgroundTasks):
+    try:
+        # Pobieranie emaili w tle
+        background_tasks.add_task(
+            fetch_emails_task
+        )
+        
+        return {"status": "success", "message": "Rozpoczęto pobieranie wiadomości email"}
+    except Exception as e:
+        logger.error(f"Błąd podczas pobierania wiadomości: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Endpoint do automatycznego odpowiadania na wiadomości email z użyciem MCP
+@app.post("/api/emails/{email_id}/auto-reply")
+async def auto_reply_to_email_endpoint(
+        email_id: int,
+        background_tasks: BackgroundTasks = None,
+        db=Depends(get_db)
+):
+    try:
+        # Pobranie wiadomości z bazy danych
+        email_record = await db.fetch_one(
+            "SELECT * FROM emails WHERE id = :id",
+            {"id": email_id}
+        )
+        
+        if not email_record:
+            raise HTTPException(status_code=404, detail="Wiadomość nie znaleziona")
+            
+        # Konwersja rekordu na obiekt EmailSchema
+        original_email = EmailSchema(
+            id=email_record["id"],
+            from_email=email_record["from_email"],
+            to_email=email_record["to_email"],
+            subject=email_record["subject"],
+            content=email_record["content"],
+            received_date=email_record["received_date"]
+        )
+        
+        # Pobranie historii wiadomości od tego nadawcy
+        email_history = await get_email_history(original_email.from_email)
+        
+        # Przygotowanie historii wiadomości w formacie dla MCP
+        mcp_email_history = []
+        for email in email_history:
+            mcp_email_history.append({
+                "from_user": True,  # Wiadomości od użytkownika
+                "content": email.get("content", ""),
+                "timestamp": email.get("received_date", "")
+            })
+            if email.get("reply_content"):
+                mcp_email_history.append({
+                    "from_user": False,  # Nasze odpowiedzi
+                    "content": email.get("reply_content", ""),
+                    "timestamp": email.get("reply_date", "")
+                })
+        
+        # Ekstrakcja nazwy nadawcy z adresu email
+        sender_name = original_email.from_email.split("@")[0]
+        
+        # Generowanie automatycznej odpowiedzi
+        auto_reply_content = await llm_service.generate_auto_reply(
+            email_content=original_email.content,
+            sender_name=sender_name,
+            email_history=mcp_email_history
+        )
+        
+        # Wysyłanie odpowiedzi w tle jeśli podano background_tasks
+        if background_tasks:
+            background_tasks.add_task(
+                email_service.reply_to_email,
+                original_email,
+                original_email.subject,
+                auto_reply_content
+            )
+            return {"status": "success", "message": f"Automatyczna odpowiedź do {original_email.from_email} zostanie wysłana w tle", "content": auto_reply_content}
+        
+        # Wysyłanie odpowiedzi synchronicznie
+        result = await email_service.reply_to_email(original_email, original_email.subject, auto_reply_content)
+        
+        if result:
+            # Aktualizacja statusu wiadomości w bazie danych
+            await db.execute(
+                "UPDATE emails SET replied = TRUE, reply_date = :reply_date, reply_content = :reply_content WHERE id = :id",
+                {
+                    "id": email_id,
+                    "reply_date": datetime.now().isoformat(),
+                    "reply_content": auto_reply_content
+                }
+            )
+            
+            return {"status": "success", "message": f"Automatyczna odpowiedź wysłana do {original_email.from_email}", "content": auto_reply_content}
+        else:
+            raise HTTPException(status_code=500, detail="Błąd podczas wysyłania automatycznej odpowiedzi")
+            
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Błąd podczas automatycznego odpowiadania na wiadomość: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Endpoint do odpowiadania na wiadomości email
+@app.post("/api/emails/{email_id}/reply")
+async def reply_to_email_endpoint(
+        email_id: int,
+        content: str = Query(..., description="Treść odpowiedzi"),
+        background_tasks: BackgroundTasks = None,
+        db=Depends(get_db)
+):
+    try:
+        # Pobranie wiadomości z bazy danych
+        email_record = await db.fetch_one(
+            "SELECT * FROM emails WHERE id = :id",
+            {"id": email_id}
+        )
+        
+        if not email_record:
+            raise HTTPException(status_code=404, detail="Wiadomość nie znaleziona")
+            
+        # Konwersja rekordu na obiekt EmailSchema
+        original_email = EmailSchema(
+            id=email_record["id"],
+            from_email=email_record["from_email"],
+            to_email=email_record["to_email"],
+            subject=email_record["subject"],
+            content=email_record["content"],
+            received_date=email_record["received_date"]
+        )
+        
+        # Wysyłanie odpowiedzi w tle jeśli podano background_tasks
+        if background_tasks:
+            background_tasks.add_task(
+                email_service.reply_to_email,
+                original_email,
+                original_email.subject,
+                content
+            )
+            return {"status": "success", "message": f"Odpowiedź do {original_email.from_email} zostanie wysłana w tle"}
+        
+        # Wysyłanie odpowiedzi synchronicznie
+        result = await email_service.reply_to_email(original_email, original_email.subject, content)
+        
+        if result:
+            # Aktualizacja statusu wiadomości w bazie danych
+            await db.execute(
+                "UPDATE emails SET replied = TRUE, reply_date = :reply_date, reply_content = :reply_content WHERE id = :id",
+                {
+                    "id": email_id,
+                    "reply_date": datetime.now().isoformat(),
+                    "reply_content": content
+                }
+            )
+            
+            return {"status": "success", "message": f"Odpowiedź wysłana do {original_email.from_email}"}
+        else:
+            raise HTTPException(status_code=500, detail="Błąd podczas wysyłania odpowiedzi")
+            
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Błąd podczas odpowiadania na wiadomość: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

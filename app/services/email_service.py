@@ -133,6 +133,47 @@ class EmailService:
             logger.error(f"Błąd podczas parsowania wiadomości: {str(e)}")
             return None
     
+    async def reply_to_email(self, original_email: EmailSchema, subject: str, content: str) -> bool:
+        """
+        Wysyła odpowiedź na wiadomość email.
+        """
+        try:
+            logger.info(f"Wysyłanie odpowiedzi do {original_email.from_email} z tematem: {subject}")
+            
+            # Tworzenie wiadomości
+            message = MIMEMultipart()
+            message["From"] = self.smtp_user
+            message["To"] = original_email.from_email
+            message["Subject"] = f"Re: {subject}"
+            message["In-Reply-To"] = f"<{original_email.id}@{self.smtp_host}>"
+            message["References"] = f"<{original_email.id}@{self.smtp_host}>"
+            
+            # Dodanie oryginalnej wiadomości jako cytatu
+            quoted_content = f"\n\nW dniu {original_email.received_date}, {original_email.from_email} napisał:\n"
+            for line in original_email.content.split("\n"):
+                quoted_content += f"> {line}\n"
+            
+            # Dodanie treści odpowiedzi i cytatu
+            full_content = f"{content}\n{quoted_content}"
+            message.attach(MIMEText(full_content, "plain"))
+            
+            # Wysyłanie wiadomości
+            smtp = aiosmtplib.SMTP(hostname=self.smtp_host, port=self.smtp_port, use_tls=self.use_tls)
+            await smtp.connect()
+            
+            if self.smtp_user and self.smtp_password:
+                await smtp.login(self.smtp_user, self.smtp_password)
+                
+            await smtp.send_message(message)
+            await smtp.quit()
+            
+            logger.info(f"Odpowiedź wysłana pomyślnie do {original_email.from_email}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Błąd podczas wysyłania odpowiedzi: {str(e)}")
+            return False
+    
     async def check_connection(self) -> bool:
         """
         Sprawdza połączenie z serwerem email.

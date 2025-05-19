@@ -240,15 +240,30 @@ Narzędzie do parsowania wiadomości e-mail. Obsługuje różne formaty wiadomo�
 ### Szczegółowy opis przepływu
 
 1. **Odbieranie wiadomości**:
-   - Komponent IMAP Apache Camel regularnie sprawdza skrzynkę pocztową
-   - Nowe wiadomości są pobierane i przekazywane do trasy przetwarzania
+   - Aplikacja regularnie sprawdza skrzynkę pocztową za pomocą protokołu IMAP
+   - Nowe wiadomości są pobierane i przekazywane do przetwarzania
 
 2. **Parsowanie wiadomości**:
-   - `EmailParser` ekstrahuje nadawcę, odbiorcę, temat i treść wiadomości
-   - Wiadomość jest konwertowana do modelu `EmailMessage`
+   - `EmailService` ekstrahuje nadawcę, odbiorcę, temat i treść wiadomości
+   - Wiadomość jest konwertowana do modelu `EmailSchema`
 
 3. **Zapisywanie w bazie danych**:
    - Wiadomość jest zapisywana w tabeli `emails` w bazie SQLite
+
+4. **Odpowiadanie na wiadomości**:
+   - Użytkownik może odpowiedzieć na wiadomość za pomocą endpointu `/api/emails/{email_id}/reply`
+   - System pobiera oryginalną wiadomość z bazy danych
+   - Tworzona jest odpowiedź zawierająca cytowaną treść oryginalnej wiadomości
+   - Odpowiedź jest wysyłana do nadawcy oryginalnej wiadomości
+   - Status wiadomości w bazie danych jest aktualizowany (pole `replied` ustawiane na `TRUE`)
+   - Treść odpowiedzi oraz data wysłania są zapisywane w bazie danych
+
+5. **Automatyczne odpowiadanie z użyciem MCP**:
+   - System może automatycznie generować odpowiedzi za pomocą endpointu `/api/emails/{email_id}/auto-reply`
+   - Wykorzystywany jest protokół MCP (Model Context Protocol) do komunikacji z modelem językowym
+   - System pobiera historię konwersacji z danym nadawcą i tworzy kontekst MCP
+   - Model językowy generuje spersonalizowaną odpowiedź na podstawie kontekstu
+   - Odpowiedź jest wysyłana do nadawcy i zapisywana w bazie danych
    - Status wiadomości jest ustawiany na `RECEIVED`
 
 4. **Analiza tonu**:
@@ -278,14 +293,17 @@ Aplikacja wykorzystuje prostą bazę danych SQLite do przechowywania wiadomości
 ```sql
 CREATE TABLE IF NOT EXISTS emails (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    from_address TEXT NOT NULL,
-    to_address TEXT NOT NULL,
-    subject TEXT,
-    content TEXT,
-    received_date TIMESTAMP,
-    processed_date TIMESTAMP,
+    from_email TEXT NOT NULL,
+    to_email TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    content TEXT NOT NULL,
+    received_date TEXT NOT NULL,
+    status TEXT DEFAULT 'NEW',
     tone_analysis TEXT,
-    status TEXT
+    sentiment TEXT,
+    replied BOOLEAN DEFAULT FALSE,
+    reply_date TEXT,
+    reply_content TEXT
 )
 ```
 

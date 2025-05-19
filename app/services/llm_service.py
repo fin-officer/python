@@ -153,15 +153,152 @@ class LlmService:
         except ValueError:
             return default
 
+    async def generate_auto_reply(self, email_content: str, sender_name: str, email_history: list = None) -> str:
+        """
+        Generuje automatyczną odpowiedź na wiadomość email przy użyciu MCP (Model Context Protocol).
+        
+        Args:
+            email_content: Treść wiadomości email
+            sender_name: Nazwa nadawcy
+            email_history: Historia wcześniejszych wiadomości od tego nadawcy (opcjonalnie)
+            
+        Returns:
+            Wygenerowana treść odpowiedzi
+        """
+        try:
+            logger.info("Generowanie automatycznej odpowiedzi..." )
+            
+            # Tworzenie kontekstu MCP
+            mcp_context = self._create_mcp_context(email_content, sender_name, email_history)
+            
+            # Wywołanie API modelu z kontekstem MCP
+            response = await self._call_llm_api_with_mcp(mcp_context)
+            
+            if not response or response.strip() == "":
+                logger.warning("Otrzymano pustą odpowiedź z modelu LLM")
+                return self._create_default_reply(sender_name)
+                
+            return response
+            
+        except Exception as e:
+            logger.error(f"Błąd podczas generowania automatycznej odpowiedzi: {str(e)}")
+            return self._create_default_reply(sender_name)
+    
+    def _create_mcp_context(self, email_content: str, sender_name: str, email_history: list = None) -> dict:
+        """
+        Tworzy kontekst MCP (Model Context Protocol) dla modelu LLM.
+        """
+        # Podstawowe informacje o firmie
+        company_info = {
+            "name": "Fin Officer",
+            "service": "Usługi finansowe i księgowe",
+            "contact_email": "contact@fin-officer.com",
+            "support_email": "support@fin-officer.com",
+            "website": "https://fin-officer.com"
+        }
+        
+        # Przygotowanie historii wiadomości
+        conversation_history = []
+        if email_history:
+            for prev_email in email_history:
+                conversation_history.append({
+                    "role": "user" if prev_email.get("from_user", False) else "assistant",
+                    "content": prev_email.get("content", ""),
+                    "timestamp": prev_email.get("timestamp", "")
+                })
+        
+        # Tworzenie pełnego kontekstu MCP
+        mcp_context = {
+            "context": {
+                "company": company_info,
+                "current_date": datetime.now().strftime("%Y-%m-%d"),
+                "sender": {
+                    "name": sender_name
+                },
+                "email": {
+                    "content": email_content
+                },
+                "conversation_history": conversation_history
+            },
+            "instructions": [
+                "Jesteś asystentem obsługi klienta firmy Fin Officer.",
+                "Odpowiedz uprzejmie i profesjonalnie na wiadomość email.",
+                "Twój ton powinien być pomocny, ale zwięzły.",
+                "Nie wymyslaj informacji, których nie ma w kontekście.",
+                "Jeśli nie znasz odpowiedzi, zaproponuj kontakt z zespołem wsparcia.",
+                "Podpisz się jako 'Zespół Fin Officer'.",
+                "Odpowiedź powinna mieć maksymalnie 5-7 zdań."
+            ],
+            "output_format": "text"
+        }
+        
+        return mcp_context
+    
+    async def _call_llm_api_with_mcp(self, mcp_context: dict) -> str:
+        """
+        Wywołuje API modelu językowego z kontekstem MCP.
+        """
+        try:
+            # Konwersja kontekstu MCP na format JSON
+            mcp_json = json.dumps(mcp_context, ensure_ascii=False)
+            
+            # Tworzenie promptu z kontekstem MCP
+            prompt = f"""
+            <mcp>
+            {mcp_json}
+            </mcp>
+            
+            Wygeneruj odpowiedź na powyższą wiadomość email zgodnie z instrukcjami MCP.
+            """
+            
+            async with aiohttp.ClientSession() as session:
+                payload = {
+                    "model": self.model,
+                    "prompt": prompt,
+                    "temperature": 0.7,
+                    "max_tokens": 1000,
+                    "stream": False
+                }
+
+                async with session.post(f"{self.api_url}/api/generate", json=payload) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        return result.get("response", "")
+                    else:
+                        logger.error(f"Błąd API: {response.status}")
+                        raise Exception(f"Błąd API LLM: {response.status}")
+        except Exception as e:
+            logger.error(f"Błąd podczas wywołania API LLM z MCP: {str(e)}")
+            raise e
+    
+    def _create_default_reply(self, sender_name: str) -> str:
+        """
+        Tworzy domyślną odpowiedź w przypadku błędu.
+        """
+        return f"""
+Szanowny/a {sender_name},
+
+Dziękujemy za wiadomość. Otrzymaliśmy Twoje zapytanie i postaramy się odpowiedzieć jak najszybciej.
+
+W razie pilnej sprawy, prosimy o kontakt telefoniczny pod numerem +48 123 456 789.
+
+Z poważaniem,
+Zespół Fin Officer
+"""
+    
     def _create_default_analysis(self) -> ToneAnalysis:
         """
         Tworzy domyślną analizę tonu.
         """
         return ToneAnalysis(
             sentiment=Sentiment.NEUTRAL,
-            emotions={Emotion.NEUTRAL: 1.0},
+            emotions={
+                Emotion.NEUTRAL: 0.8,
+                Emotion.HAPPINESS: 0.1,
+                Emotion.SURPRISE: 0.1
+            },
             urgency=Urgency.NORMAL,
             formality=Formality.NEUTRAL,
-            top_topics=[],
-            summary_text="Nie można przeanalizować treści wiadomości."
+            top_topics=["zapytanie", "informacja"],
+            summary_text="Brak możliwości analizy wiadomości."
         )

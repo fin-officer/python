@@ -73,10 +73,8 @@ async_session = sessionmaker(
 # Funkcja inicjalizująca bazę danych
 async def init_db():
     try:
-        # Tworzenie tabel jeśli nie istnieją
         async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
+            await conn.execute("\n                CREATE TABLE IF NOT EXISTS emails (\n                    id INTEGER PRIMARY KEY AUTOINCREMENT,\n                    from_email TEXT NOT NULL,\n                    to_email TEXT NOT NULL,\n                    subject TEXT NOT NULL,\n                    content TEXT NOT NULL,\n                    received_date TEXT NOT NULL,\n                    status TEXT DEFAULT 'NEW',\n                    tone_analysis TEXT,\n                    sentiment TEXT,\n                    replied BOOLEAN DEFAULT FALSE,\n                    reply_date TEXT,\n                    reply_content TEXT\n                )\n            ")
         logger.info("Baza danych zainicjalizowana pomyślnie")
     except Exception as e:
         logger.error(f"Błąd podczas inicjalizacji bazy danych: {str(e)}")

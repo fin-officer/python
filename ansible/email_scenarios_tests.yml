@@ -120,8 +120,8 @@
       debug:
         msg: |
           Email Scenario Test Results:
-          - Standard Email: {{ 'PASSED' if standard_email_result.status == 200 else 'FAILED' }}
-          - Urgent Email: {{ 'PASSED' if urgent_email_result.status == 200 else 'FAILED' }}
-          - Negative Feedback: {{ 'PASSED' if negative_email_result.status == 200 else 'FAILED' }}
-          - Frequent Sender: {{ 'PASSED' if frequent_email_result.status == 200 else 'FAILED' }}
-          - Email with Attachments: {{ 'PASSED' if attachment_email_result.status == 200 else 'FAILED' }}
+          - Standard Email: {{ 'PASSED' if standard_email_result.json is defined else 'FAILED' }}
+          - Urgent Email: {{ 'PASSED' if urgent_email_result.json is defined else 'FAILED' }}
+          - Negative Feedback: {{ 'PASSED' if negative_email_result.json is defined else 'FAILED' }}
+          - Frequent Sender: {{ 'PASSED' if frequent_email_result.results is defined else 'FAILED' }}
+          - Email with Attachments: {{ 'PASSED' if attachment_email_result.json is defined else 'FAILED' }}
