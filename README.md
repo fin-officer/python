@@ -179,6 +179,22 @@ Aby uruchomić wszystkie testy:
 tox
 ```
 
+Szczegółowy raport z testów funkcjonalności auto-reply znajduje się w pliku [TEST_REPORT.md](TEST_REPORT.md).
+
+### Testy auto-reply
+
+Funkcjonalność automatycznych odpowiedzi została przetestowana przy użyciu:
+
+1. **Testów jednostkowych**: Sprawdzających generowanie odpowiedzi przez serwis LLM
+2. **Testów endpointów**: Weryfikujących poprawność działania API
+3. **Testów integracyjnych**: Sprawdzających współpracę między komponentami
+
+Aby uruchomić tylko testy auto-reply:
+
+```bash
+python -m pytest tests/test_auto_reply_simple.py tests/test_auto_reply_endpoint_simple.py
+```
+
 ## Dostosowanie Systemu
 
 ### Dodawanie nowych funkcjonalności
