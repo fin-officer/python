@@ -6,7 +6,7 @@ from datetime import datetime
 import aiosmtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from aioimaplib import aioimaplib
+import aioimaplib
 from dotenv import load_dotenv
 
 from models import EmailSchema
@@ -76,7 +76,7 @@ class EmailService:
             logger.info("Pobieranie wiadomości email z serwera...")
             
             # Połączenie z serwerem IMAP
-            imap_client = aioimaplib.AIOIMAP(host=self.imap_host, port=self.imap_port)
+            imap_client = aioimaplib.IMAP4_SSL(host=self.imap_host, port=self.imap_port)
             await imap_client.wait_hello_from_server()
             
             # Logowanie

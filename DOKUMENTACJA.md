@@ -122,25 +122,46 @@ To polecenie uruchomi:
 - Serwer Ollama do hostowania modelu LLM
 - Adminer do zarządzania bazą danych SQLite
 
+### Automatyczna instalacja
+
+Aplikacja zawiera skrypt instalacyjny, który automatycznie zainstaluje wszystkie wymagane zależności:
+
+```bash
+./scripts/install.sh
+```
+
+Skrypt ten:
+- Sprawdza i instaluje Docker, jeśli nie jest zainstalowany
+- Sprawdza i instaluje Docker Compose, jeśli nie jest zainstalowany
+- Sprawdza i instaluje Ansible, jeśli nie jest zainstalowany
+- Instaluje wszystkie zależności Python z pliku requirements.txt
+- Tworzy wymagane katalogi i ustawia odpowiednie uprawnienia
+
+### Uruchomienie z użyciem Docker Compose
+
+Po zainstalowaniu zależności, można uruchomić aplikację za pomocą Docker Compose:
+
+```bash
+docker-compose up -d
+```
+
+Lub użyć dołączonego skryptu:
+
+```bash
+./run-python.sh
+```
+
 ### Uruchomienie lokalne bez Dockera
 
-1. Zbuduj projekt:
-   ```
-   ./gradlew build
+1. Zainstaluj zależności Python:
+   ```bash
+   pip install -r requirements.txt
    ```
 
 2. Uruchom aplikację:
+   ```bash
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    ```
-   ./gradlew run
-   ```
-
-### Uruchomienie z użyciem skryptu
-
-Można również użyć dołączonego skryptu do uruchomienia aplikacji:
-
-```
-./run.sh
-```
 
 ## Konfiguracja
 
@@ -447,6 +468,92 @@ Gdzie:
 - `new` - Symuluje odpowiedź dla nowego nadawcy
 
 Ten skrypt tworzy przykładową bazę danych SQLite z historią komunikacji oraz pliki szablonów, a następnie demonstruje, jak system wybiera odpowiedni szablon i generuje spersonalizowaną odpowiedź.
+
+### Testy Ansible
+
+Aplikacja zawiera również zestaw testów Ansible, które automatyzują testowanie funkcjonalności email. Testy te znajdują się w katalogu `ansible/` i mogą być uruchamiane za pomocą skryptu `run_tests.sh`.
+
+#### Instalacja Ansible
+
+Przed uruchomieniem testów Ansible, należy zainstalować Ansible:
+
+```bash
+# Instalacja Ansible na Ubuntu/Debian
+sudo apt update
+sudo apt install ansible
+
+# Instalacja Ansible na CentOS/RHEL
+sudo yum install epel-release
+sudo yum install ansible
+
+# Instalacja Ansible przez pip
+pip install ansible
+```
+
+Można sprawdzić poprawność instalacji komendą:
+
+```bash
+ansible --version
+```
+
+#### Uruchamianie testów Ansible
+
+Po zainstalowaniu Ansible, można uruchomić testy za pomocą skryptu `run`:
+
+```bash
+cd /home/tom/github/fin-officer/python
+./ansible/run
+```
+
+Lub z poziomu katalogu ansible:
+
+```bash
+cd /home/tom/github/fin-officer/python/ansible
+./run
+```
+
+Można również uruchomić konkretne testy lub scenariusze:
+
+```bash
+# Uruchomienie tylko podstawowych testów email
+./run email_tests.yml
+
+# Uruchomienie testów z określonymi tagami
+./run email_scenarios_tests.yml --tags "standard_email,urgent_email"
+```
+
+**Uwaga:** Skrypt `run` automatycznie zainstaluje Ansible, jeśli nie jest jeszcze zainstalowany.
+
+**Uwaga:** Przed uruchomieniem testów upewnij się, że aplikacja jest uruchomiona za pomocą Docker Compose.
+
+```bash
+# Uruchomienie aplikacji w tle
+docker-compose up -d
+```
+
+#### Struktura testów Ansible
+
+Testy Ansible są podzielone na kilka playbook'ów:
+
+1. **email_tests.yml** - Podstawowe testy funkcjonalności email, w tym:
+   - Sprawdzanie stanu aplikacji
+   - Wysyłanie testowych wiadomości email
+   - Weryfikacja dostarczenia wiadomości do MailHog
+   - Testowanie ręcznego przetwarzania wiadomości
+
+2. **email_service_tests.yml** - Testy skupiające się na usłudze email:
+   - Testowanie połączenia z usługą email
+   - Weryfikacja wysyłania i odbierania wiadomości
+   - Sprawdzanie funkcjonalności pobierania wiadomości
+
+3. **email_scenarios_tests.yml** - Testy różnych scenariuszy email:
+   - Standardowe wiadomości
+   - Pilne wiadomości
+   - Wiadomości z negatywnym feedbackiem
+   - Wiadomości od częstych nadawców
+   - Wiadomości z załącznikami (symulowane)
+
+Testy te zapewniają kompleksowe sprawdzenie funkcjonalności email aplikacji i mogą być używane do weryfikacji poprawności działania po wprowadzeniu zmian w kodzie.
 
 ## Rozszerzanie funkcjonalności
 

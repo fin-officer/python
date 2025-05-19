@@ -54,6 +54,46 @@ if ! command -v docker-compose &> /dev/null; then
     docker-compose --version
 fi
 
+# Sprawdzenie, czy Ansible jest zainstalowany
+if ! command -v ansible &> /dev/null; then
+    echo "Ansible nie jest zainstalowany. Instalowanie Ansible..."
+
+    # Instalacja dla systemów bazujących na Debian/Ubuntu
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get update
+        sudo apt-get install -y ansible
+
+    # Instalacja dla systemów bazujących na Red Hat/CentOS
+    elif command -v yum &> /dev/null; then
+        # Sprawdzenie wersji systemu
+        if grep -q 'Fedora' /etc/os-release; then
+            sudo dnf install -y ansible
+        else
+            sudo yum install -y epel-release
+            sudo yum install -y ansible
+        fi
+
+    # Instalacja dla MacOS (wymaga Homebrew)
+    elif command -v brew &> /dev/null; then
+        brew install ansible
+    # Instalacja przez pip jako ostatnia opcja
+    elif command -v pip &> /dev/null || command -v pip3 &> /dev/null; then
+        PIP_CMD="pip"
+        if ! command -v pip &> /dev/null; then
+            PIP_CMD="pip3"
+        fi
+        $PIP_CMD install --user ansible
+        echo "Ansible został zainstalowany przez pip. Upewnij się, że ścieżka do binarek pip jest w zmiennej PATH."
+    else
+        echo "Nie można automatycznie zainstalować Ansible dla tego systemu operacyjnego."
+        echo "Odwiedź https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html aby uzyskać instrukcje instalacji."
+        exit 1
+    fi
+
+    # Sprawdzenie instalacji
+    ansible --version
+fi
+
 # Sprawdzenie, czy Node.js jest zainstalowany (opcjonalnie, do lokalnego developmentu)
 if ! command -v node &> /dev/null; then
     echo "Node.js nie jest zainstalowany. Instalowanie Node.js..."
@@ -88,9 +128,22 @@ if [ ! -f .env ]; then
     echo "Plik .env został utworzony. Proszę dostosować zmienne środowiskowe według potrzeb."
 fi
 
+# Instalacja zależności Python
+echo "Instalacja zależności Python..."
+if command -v pip3 &> /dev/null; then
+    pip3 install -r requirements.txt
+elif command -v pip &> /dev/null; then
+    pip install -r requirements.txt
+else
+    echo "Nie znaleziono pip. Proszę zainstalować pip, aby kontynuować."
+    exit 1
+fi
+
 # Instalacja zależności Node.js (opcjonalnie, do lokalnego developmentu)
-echo "Instalacja zależności npm..."
-npm install
+if command -v npm &> /dev/null; then
+    echo "Instalacja zależności npm..."
+    npm install
+fi
 
 # Tworzenie katalogów dla danych i logów
 mkdir -p data logs

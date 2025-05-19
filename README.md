@@ -17,6 +17,18 @@ Minimalistyczna aplikacja do przetwarzania wiadomości e-mail z wykorzystaniem m
 
 - Python 3.9 lub nowszy
 - Docker i Docker Compose (dla łatwego uruchomienia)
+- Ansible 2.9 lub nowszy (dla testów automatycznych)
+  ```bash
+  # Instalacja Ansible na Ubuntu/Debian
+  sudo apt update
+  sudo apt install ansible
+  
+  # Instalacja Ansible na CentOS/RHEL
+  sudo yum install epel-release
+  sudo yum install ansible
+  
+  # Instalacja Ansible przez pip
+  pip install ansible
 
 ## Szybki Start
 
@@ -26,14 +38,25 @@ Minimalistyczna aplikacja do przetwarzania wiadomości e-mail z wykorzystaniem m
    cd email-llm-processor-python
    ```
 
-2. Uruchom aplikację:
+2. Zainstaluj wymagane zależności:
+   ```bash
+   ./scripts/install.sh
+   ```
+   Skrypt automatycznie zainstaluje Docker, Docker Compose, Ansible i wszystkie wymagane zależności Python.
+
+3. Uruchom aplikację:
    ```bash
    ./run-python.sh
    ```
 
-3. Przetestuj system:
+4. Przetestuj system:
    ```bash
    ./test-python.sh urgent
+   ```
+
+5. Uruchom testy Ansible (opcjonalnie):
+   ```bash
+   ./ansible/run
    ```
 
 4. Otwórz interfejs API w przeglądarce:
@@ -53,6 +76,14 @@ email-llm-processor-python/
 │   │   └── db_service.py           # Usługa bazy danych
 │   └── processors/
 │       └── email_processor.py      # Logika przetwarzania emaili
+├── ansible/                        # Testy Ansible
+│   ├── main.yml                    # Główny playbook testowy
+│   ├── email_tests.yml             # Testy podstawowej funkcjonalności email
+│   ├── email_service_tests.yml     # Testy usługi email
+│   ├── email_scenarios_tests.yml   # Testy różnych scenariuszy email
+│   ├── inventory.ini               # Plik inwentarza Ansible
+│   ├── ansible.cfg                 # Konfiguracja Ansible
+│   └── run_tests.sh                # Skrypt do uruchamiania testów
 ├── docker-compose.yml              # Konfiguracja Docker Compose
 ├── Dockerfile                      # Definicja obrazu Docker
 ├── requirements.txt                # Zależności Pythona
