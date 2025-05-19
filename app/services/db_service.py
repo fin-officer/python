@@ -16,9 +16,12 @@ load_dotenv()
 logger = logging.getLogger("db_service")
 
 # Konfiguracja bazy danych
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data/emails.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:////data/emails.db")  # Use absolute path with 4 slashes
 if DATABASE_URL.startswith("sqlite:"):
     DATABASE_URL = DATABASE_URL.replace("sqlite:", "sqlite+aiosqlite:")
+    
+# Ensure data directory exists
+os.makedirs(os.path.dirname(DATABASE_URL.replace("sqlite+aiosqlite://", "")), exist_ok=True)
 
 # Definicja modelu bazowego
 Base = declarative_base()
