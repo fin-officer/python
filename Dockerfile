@@ -7,8 +7,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Create directories for data
-RUN mkdir -p /data/templates /data/archive
+# Create directories for data with proper permissions
+RUN mkdir -p /data/templates /data/archive && chmod -R 777 /data
 
 # Install Python dependencies individually to avoid conflicts
 RUN pip install --upgrade pip && \
@@ -34,6 +34,11 @@ RUN pip install --upgrade pip && \
 
 # Copy application code
 COPY ./app /app/
+
+# Verify email_service.py exists and contains EmailService class
+RUN ls -la /app/services/ && \
+    cat /app/services/email_service.py | grep -q 'class EmailService' && \
+    echo 'EmailService class found in email_service.py'
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1

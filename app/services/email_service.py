@@ -1,167 +1,148 @@
 import os
-import aiohttp
 import logging
-import json
-from typing import Dict, Any, Optional
+import asyncio
+from typing import List, Dict, Any, Optional
+from datetime import datetime
+import aiosmtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from aioimaplib import aioimaplib
 from dotenv import load_dotenv
 
-from models import ToneAnalysis, Sentiment, Emotion, Urgency, Formality
+from models import EmailSchema
 
 # Załaduj zmienne środowiskowe
 load_dotenv()
 
-logger = logging.getLogger("llm_service")
+logger = logging.getLogger("email_service")
 
 
-class LlmService:
+class EmailService:
     def __init__(self):
-        self.api_url = os.getenv("LLM_API_URL", "http://localhost:11434")
-        self.model = os.getenv("LLM_MODEL", "llama2")
-        logger.info(f"Inicjalizacja LLM Service z URL: {self.api_url}, model: {self.model}")
-
-    async def analyze_tone(self, content: str) -> ToneAnalysis:
+        # Konfiguracja SMTP
+        self.smtp_host = os.getenv("EMAIL_HOST", "mailhog")
+        self.smtp_port = int(os.getenv("EMAIL_PORT", 1025))
+        self.smtp_user = os.getenv("EMAIL_USER", "test@example.com")
+        self.smtp_password = os.getenv("EMAIL_PASSWORD", "")
+        self.use_tls = os.getenv("EMAIL_USE_TLS", "False").lower() == "true"
+        
+        # Konfiguracja IMAP
+        self.imap_host = os.getenv("IMAP_HOST", self.smtp_host)
+        self.imap_port = int(os.getenv("IMAP_PORT", 993))
+        self.imap_user = os.getenv("IMAP_USER", self.smtp_user)
+        self.imap_password = os.getenv("IMAP_PASSWORD", self.smtp_password)
+        
+        logger.info(f"Inicjalizacja Email Service z SMTP: {self.smtp_host}:{self.smtp_port}, IMAP: {self.imap_host}:{self.imap_port}")
+    
+    async def send_email(self, to_email: str, subject: str, content: str, from_email: Optional[str] = None) -> bool:
         """
-        Analizuje ton wiadomości email przy użyciu LLM.
+        Wysyła wiadomość email.
         """
-        if not content or content.strip() == "":
-            logger.warning("Pusta treść wiadomości, zwracanie domyślnej analizy")
-            return self._create_default_analysis()
-
+        if not from_email:
+            from_email = self.smtp_user
+            
         try:
-            logger.info("Analizowanie tonu wiadomości...")
-
-            # Tworzenie promptu dla modelu LLM
-            prompt = self._create_analysis_prompt(content)
-
-            # Wywołanie API modelu
-            response = await self._call_llm_api(prompt)
-
-            # Parsowanie odpowiedzi
-            return self._parse_analysis_response(response)
-
+            logger.info(f"Wysyłanie wiadomości do {to_email} z tematem: {subject}")
+            
+            # Tworzenie wiadomości
+            message = MIMEMultipart()
+            message["From"] = from_email
+            message["To"] = to_email
+            message["Subject"] = subject
+            message.attach(MIMEText(content, "plain"))
+            
+            # Wysyłanie wiadomości
+            smtp = aiosmtplib.SMTP(hostname=self.smtp_host, port=self.smtp_port, use_tls=self.use_tls)
+            await smtp.connect()
+            
+            if self.smtp_user and self.smtp_password:
+                await smtp.login(self.smtp_user, self.smtp_password)
+                
+            await smtp.send_message(message)
+            await smtp.quit()
+            
+            logger.info(f"Wiadomość wysłana pomyślnie do {to_email}")
+            return True
+            
         except Exception as e:
-            logger.error(f"Błąd podczas analizy tonu: {str(e)}")
-            return self._create_default_analysis()
-
+            logger.error(f"Błąd podczas wysyłania wiadomości: {str(e)}")
+            return False
+    
+    async def fetch_emails(self, max_emails: int = 10) -> List[EmailSchema]:
+        """
+        Pobiera wiadomości email z serwera IMAP.
+        """
+        try:
+            logger.info("Pobieranie wiadomości email z serwera...")
+            
+            # Połączenie z serwerem IMAP
+            imap_client = aioimaplib.AIOIMAP(host=self.imap_host, port=self.imap_port)
+            await imap_client.wait_hello_from_server()
+            
+            # Logowanie
+            if self.imap_user and self.imap_password:
+                await imap_client.login(self.imap_user, self.imap_password)
+            
+            # Wybieranie skrzynki odbiorczej
+            await imap_client.select("INBOX")
+            
+            # Wyszukiwanie nieprzeczytanych wiadomości
+            _, data = await imap_client.search("UNSEEN")
+            message_ids = data.decode().split()
+            
+            # Ograniczenie liczby wiadomości
+            message_ids = message_ids[:max_emails]
+            
+            emails = []
+            for msg_id in message_ids:
+                _, data = await imap_client.fetch(msg_id, "(RFC822)")
+                
+                # Przetwarzanie wiadomości
+                email = self._parse_email(data)
+                if email:
+                    emails.append(email)
+                    
+                # Oznaczanie wiadomości jako przeczytanej
+                await imap_client.store(msg_id, "+FLAGS", "\\Seen")
+            
+            # Zamykanie połączenia
+            await imap_client.logout()
+            
+            logger.info(f"Pobrano {len(emails)} wiadomości email")
+            return emails
+            
+        except Exception as e:
+            logger.error(f"Błąd podczas pobierania wiadomości: {str(e)}")
+            return []
+    
+    def _parse_email(self, raw_data) -> Optional[EmailSchema]:
+        """
+        Parsuje surowe dane wiadomości email.
+        """
+        try:
+            # Tutaj powinno być parsowanie wiadomości email
+            # W uproszczonej wersji zwracamy testową wiadomość
+            return EmailSchema(
+                from_email="sender@example.com",
+                to_email=self.smtp_user,
+                subject="Testowa wiadomość",
+                content="To jest treść testowej wiadomości email.",
+                received_date=datetime.now().isoformat()
+            )
+        except Exception as e:
+            logger.error(f"Błąd podczas parsowania wiadomości: {str(e)}")
+            return None
+    
     async def check_connection(self) -> bool:
         """
-        Sprawdza połączenie z API modelu językowego.
+        Sprawdza połączenie z serwerem email.
         """
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(f"{self.api_url}/api/version") as response:
-                    return response.status == 200
+            # Sprawdzanie połączenia SMTP
+            smtp = aiosmtplib.SMTP(hostname=self.smtp_host, port=self.smtp_port, use_tls=self.use_tls)
+            await smtp.connect()
+            await smtp.quit()
+            return True
         except Exception as e:
-            logger.error(f"Błąd podczas sprawdzania połączenia z LLM API: {str(e)}")
+            logger.error(f"Błąd podczas sprawdzania połączenia z serwerem email: {str(e)}")
             return False
-
-    def _create_analysis_prompt(self, content: str) -> str:
-        """
-        Tworzy prompt dla modelu LLM do analizy tonu.
-        """
-        return f"""
-        Przeanalizuj poniższą wiadomość email i podaj:
-        1. Ogólny sentyment (VERY_NEGATIVE, NEGATIVE, NEUTRAL, POSITIVE, VERY_POSITIVE)
-        2. Główne emocje (ANGER, FEAR, HAPPINESS, SADNESS, SURPRISE, DISGUST, NEUTRAL) z wartościami od 0 do 1
-        3. Pilność (LOW, NORMAL, HIGH, CRITICAL)
-        4. Formalność (VERY_INFORMAL, INFORMAL, NEUTRAL, FORMAL, VERY_FORMAL)
-        5. Główne tematy (lista słów kluczowych)
-        6. Krótkie podsumowanie treści
-
-        Odpowiedź podaj w formacie JSON.
-
-        Wiadomość:
-        {content}
-        """
-
-    async def _call_llm_api(self, prompt: str) -> str:
-        """
-        Wywołuje API modelu językowego.
-        """
-        try:
-            async with aiohttp.ClientSession() as session:
-                payload = {
-                    "model": self.model,
-                    "prompt": prompt,
-                    "temperature": 0.7,
-                    "max_tokens": 1000
-                }
-
-                async with session.post(f"{self.api_url}/api/generate", json=payload) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        return result.get("response", "")
-                    else:
-                        logger.error(f"Błąd API: {response.status}")
-                        raise Exception(f"Błąd API LLM: {response.status}")
-        except Exception as e:
-            logger.error(f"Błąd podczas wywołania API LLM: {str(e)}")
-            raise e
-
-    def _parse_analysis_response(self, response: str) -> ToneAnalysis:
-        """
-        Parsuje odpowiedź API do modelu ToneAnalysis.
-        """
-        try:
-            # Próba znalezienia bloku JSON w odpowiedzi
-            import re
-            json_match = re.search(r'{.*}', response, re.DOTALL)
-
-            if not json_match:
-                logger.warning("Nie znaleziono JSON w odpowiedzi LLM")
-                return self._create_default_analysis()
-
-            json_str = json_match.group(0)
-            data = json.loads(json_str)
-
-            # Przetwarzanie emocji
-            emotions = {}
-            if isinstance(data.get("emotions"), dict):
-                for emotion_key, value in data["emotions"].items():
-                    try:
-                        emotion = Emotion(emotion_key)
-                        emotions[emotion] = float(value)
-                    except (ValueError, TypeError):
-                        pass
-
-            # Jeśli nie ma żadnych emocji, dodaj domyślną
-            if not emotions:
-                emotions[Emotion.NEUTRAL] = 1.0
-
-            return ToneAnalysis(
-                sentiment=self._parse_enum(data.get("sentiment"), Sentiment, Sentiment.NEUTRAL),
-                emotions=emotions,
-                urgency=self._parse_enum(data.get("urgency"), Urgency, Urgency.NORMAL),
-                formality=self._parse_enum(data.get("formality"), Formality, Formality.NEUTRAL),
-                top_topics=data.get("topTopics", []),
-                summary_text=data.get("summaryText", "")
-            )
-
-        except Exception as e:
-            logger.error(f"Błąd podczas parsowania odpowiedzi API: {str(e)}")
-            return self._create_default_analysis()
-
-    def _parse_enum(self, value, enum_class, default):
-        """
-        Bezpiecznie parsuje wartość do enuma.
-        """
-        if value is None:
-            return default
-
-        try:
-            return enum_class(value)
-        except ValueError:
-            return default
-
-    def _create_default_analysis(self) -> ToneAnalysis:
-        """
-        Tworzy domyślną analizę tonu.
-        """
-        return ToneAnalysis(
-            sentiment=Sentiment.NEUTRAL,
-            emotions={Emotion.NEUTRAL: 1.0},
-            urgency=Urgency.NORMAL,
-            formality=Formality.NEUTRAL,
-            top_topics=[],
-            summary_text="Nie można przeanalizować treści wiadomości."
-        )
