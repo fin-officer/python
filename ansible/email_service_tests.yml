@@ -105,6 +105,68 @@
       when: email_service_status is defined and email_service_status == "UP"
       ignore_errors: yes
 
+    - name: Test auto-reply functionality
+      block:
+        - name: Create test email for auto-reply
+          uri:
+            url: "{{ api_base_url }}/api/emails/process"
+            method: POST
+            body_format: json
+            body:
+              from_email: "test@example.com"
+              to_email: "{{ test_email }}"
+              subject: "Question about financial services"
+              content: "Hello, I am interested in your financial services. Could you please provide more information about your accounting packages for small businesses? I currently have 5 employees and need help with monthly bookkeeping and tax filing. Thank you, John"
+              received_date: "{{ ansible_date_time.iso8601 }}"
+            status_code: 200
+          register: create_email_result
+          ignore_errors: yes
+
+        - name: Get email ID from created email
+          set_fact:
+            email_id: "1"  # For simplicity, assuming this is the first email
+          when: create_email_result.status == 200
+
+        - name: Generate auto-reply using MCP
+          uri:
+            url: "{{ api_base_url }}/api/emails/{{ email_id }}/auto-reply"
+            method: POST
+            status_code: 200
+          register: auto_reply_result
+          ignore_errors: yes
+          when: email_id is defined
+
+        - name: Wait for auto-reply email to be delivered (5 seconds)
+          pause:
+            seconds: 5
+          when: auto_reply_result is defined and auto_reply_result.status == 200
+
+        - name: Check MailHog for auto-reply email
+          uri:
+            url: "{{ mailhog_api_url }}/search?kind=from&query=support@fin-officer.com"
+            method: GET
+            return_content: yes
+          register: auto_reply_mailhog_search
+          ignore_errors: yes
+          when: auto_reply_result is defined and auto_reply_result.status == 200
+
+        - name: Display auto-reply content
+          debug:
+            var: auto_reply_result.json.content
+          when: auto_reply_result is defined and auto_reply_result.status == 200
+
+        - name: Verify auto-reply delivery
+          assert:
+            that:
+              - auto_reply_mailhog_search.status == 200
+              - auto_reply_mailhog_search.json.count > 0
+            fail_msg: "Auto-reply email was not delivered to MailHog"
+            success_msg: "Auto-reply email was successfully delivered to MailHog"
+          ignore_errors: yes
+          when: auto_reply_mailhog_search is defined
+      when: email_service_status is defined and email_service_status == "UP"
+      ignore_errors: yes
+
     - name: Summary of email service tests
       debug:
         msg: |
@@ -114,3 +176,5 @@
           - Send Test Email: {{ 'PASSED' if send_email_result.status == 200 else 'FAILED' }}
           - Email Delivery Verification: {{ 'PASSED' if mailhog_search.status == 200 and mailhog_search.json.count > 0 else 'FAILED' }}
           - Email Fetch Functionality: {{ 'PASSED' if fetch_result.status == 200 else 'NOT TESTED or FAILED' }}
+          - Auto-Reply Functionality: {{ 'PASSED' if auto_reply_result.status == 200 else 'NOT TESTED or FAILED' }}
+          - Auto-Reply Delivery: {{ 'PASSED' if auto_reply_mailhog_search.status == 200 and auto_reply_mailhog_search.json.count > 0 else 'NOT TESTED or FAILED' }}

@@ -7,6 +7,8 @@ import sys
 import os
 
 # Set up the base URL for the API
+# When running inside Docker container, use 'localhost'
+# When running from host machine, use 'localhost'
 BASE_URL = "http://localhost:8000"
 
 def print_colored(text, color="green"):
@@ -28,18 +30,18 @@ def check_api_health():
     try:
         response = requests.get(f"{BASE_URL}/health")
         if response.status_code == 200:
-            print_colored("u2705 API is running", "green")
+            print_colored("✅ API is running", "green")
             return True
         else:
-            print_colored(f"u274c API returned status code {response.status_code}", "red")
+            print_colored(f"❌ API returned status code {response.status_code}", "red")
             return False
     except requests.exceptions.ConnectionError:
-        print_colored("u274c Could not connect to the API. Make sure the application is running.", "red")
+        print_colored("❌ Could not connect to the API. Make sure the application is running.", "red")
         return False
 
 def create_test_email():
     """Create a test email in the system"""
-    print_colored("\nud83dudce7 Creating test email...", "blue")
+    print_colored("\n📧 Creating test email...", "blue")
     
     email_data = {
         "from_email": "test@example.com",
@@ -57,32 +59,32 @@ def create_test_email():
         )
         
         if response.status_code == 200:
-            print_colored("u2705 Test email created successfully", "green")
-            print_colored(f"ud83dudcc4 Response: {json.dumps(response.json(), indent=2)}", "cyan")
+            print_colored("✅ Test email created successfully", "green")
+            print_colored(f"📄 Response: {json.dumps(response.json(), indent=2)}", "cyan")
             return True
         else:
-            print_colored(f"u274c Failed to create test email: {response.status_code}", "red")
+            print_colored(f"❌ Failed to create test email: {response.status_code}", "red")
             print_colored(f"ud83dudcc4 Response: {response.text}", "red")
             return False
     except Exception as e:
-        print_colored(f"u274c Error creating test email: {str(e)}", "red")
+        print_colored(f"❌ Error creating test email: {str(e)}", "red")
         return False
 
 def get_latest_email_id():
     """Get the ID of the latest email in the system"""
-    print_colored("\nud83dudd0d Getting latest email ID...", "blue")
+    print_colored("\n🔍 Getting latest email ID...", "blue")
     
     try:
         # This is a simplified approach - in a real system, you might have an endpoint to list emails
         # For testing purposes, we'll just use ID 1 since we just created it
         return 1
     except Exception as e:
-        print_colored(f"u274c Error getting latest email ID: {str(e)}", "red")
+        print_colored(f"❌ Error getting latest email ID: {str(e)}", "red")
         return None
 
 def test_auto_reply(email_id):
     """Test the auto-reply functionality"""
-    print_colored(f"\nud83eudd16 Testing auto-reply for email ID {email_id}...", "blue")
+    print_colored(f"\n🤖 Testing auto-reply for email ID {email_id}...", "blue")
     
     try:
         response = requests.post(
@@ -91,19 +93,19 @@ def test_auto_reply(email_id):
         )
         
         if response.status_code == 200:
-            print_colored("u2705 Auto-reply generated successfully", "green")
+            print_colored("✅ Auto-reply generated successfully", "green")
             result = response.json()
-            print_colored(f"ud83dudcc4 Status: {result.get('status')}", "cyan")
-            print_colored(f"ud83dudcc4 Message: {result.get('message')}", "cyan")
-            print_colored("\nud83dudcdd Auto-reply content:", "yellow")
+            print_colored(f"📄 Status: {result.get('status')}", "cyan")
+            print_colored(f"📄 Message: {result.get('message')}", "cyan")
+            print_colored("\n📝 Auto-reply content:", "yellow")
             print_colored(f"{result.get('content')}", "white")
             return True
         else:
-            print_colored(f"u274c Failed to generate auto-reply: {response.status_code}", "red")
+            print_colored(f"❌ Failed to generate auto-reply: {response.status_code}", "red")
             print_colored(f"ud83dudcc4 Response: {response.text}", "red")
             return False
     except Exception as e:
-        print_colored(f"u274c Error testing auto-reply: {str(e)}", "red")
+        print_colored(f"❌ Error testing auto-reply: {str(e)}", "red")
         return False
 
 def main():
@@ -127,7 +129,7 @@ def main():
     if not test_auto_reply(email_id):
         sys.exit(1)
     
-    print_colored("\nu2705 All tests passed successfully!", "green")
+    print_colored("\n✅ All tests passed successfully!", "green")
 
 if __name__ == "__main__":
     main()
