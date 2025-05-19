@@ -1,19 +1,18 @@
-import asyncio
 import logging
-import os
 from datetime import datetime
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
-from models import EmailResponse, EmailSchema, TemplateListResponse, TemplateResponse
-from processors.email_processor import archive_email, process_email
-from services.db_service import EmailTable, get_db, get_email_history, init_db, save_email
-from services.email_service import EmailService
-from services.llm_service import LlmService
-from services.template_service import TemplateService
 from sqlalchemy import select, text
+
+from app.models import EmailResponse, EmailSchema, TemplateListResponse, TemplateResponse
+from app.processors.email_processor import process_email
+from app.services.db_service import EmailTable, get_db, get_email_history, init_db, save_email
+from app.services.email_service import EmailService
+from app.services.llm_service import LlmService
+from app.services.template_service import TemplateService
 
 # Załaduj zmienne środowiskowe
 load_dotenv()
