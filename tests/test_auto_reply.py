@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
+# Simple test script for the auto-reply functionality
+# This script is designed to be run inside the Docker container
+
 import requests
 import json
 import time
 import sys
-import os
 
 # Set up the base URL for the API
-# When running inside Docker container, use 'localhost'
-# When running from host machine, use 'localhost'
 BASE_URL = "http://localhost:8000"
 
 def print_colored(text, color="green"):
