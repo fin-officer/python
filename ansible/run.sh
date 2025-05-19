@@ -13,8 +13,33 @@ echo ""
 
 # Check if Ansible is installed
 if ! command -v ansible-playbook &> /dev/null; then
-    echo "Error: ansible-playbook command not found. Please install Ansible."
-    exit 1
+    echo "Installing Ansible..."
+
+    # Install Ansible based on the detected OS
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get update
+        sudo apt-get install -y ansible
+    elif command -v yum &> /dev/null; then
+        if grep -q 'Fedora' /etc/os-release; then
+            sudo dnf install -y ansible
+        else
+            sudo yum install -y epel-release
+            sudo yum install -y ansible
+        fi
+    elif command -v brew &> /dev/null; then
+        brew install ansible
+    elif command -v pip3 &> /dev/null; then
+        pip3 install --user ansible
+    elif command -v pip &> /dev/null; then
+        pip install --user ansible
+    else
+        echo "Error: Could not install Ansible automatically."
+        echo "Please install Ansible manually and try again."
+        echo "Visit: https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html"
+        exit 1
+    fi
+
+    echo "Ansible installed successfully."
 fi
 
 # Check if application is running
