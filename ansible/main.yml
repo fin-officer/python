@@ -13,11 +13,8 @@
           These tests will verify the functionality of the Email LLM Processor application
           including email sending, receiving, and processing capabilities.
 
-    - name: Include basic email functionality tests
-      import_playbook: email_tests.yml
+- import_playbook: email_tests.yml
 
-    - name: Include email service tests
-      import_playbook: email_service_tests.yml
+- import_playbook: email_service_tests.yml
 
-    - name: Include email scenario tests
-      import_playbook: email_scenarios_tests.yml
+- import_playbook: email_scenarios_tests.yml
