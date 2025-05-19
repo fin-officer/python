@@ -74,7 +74,25 @@ async_session = sessionmaker(
 async def init_db():
     try:
         async with engine.begin() as conn:
-            await conn.execute("\n                CREATE TABLE IF NOT EXISTS emails (\n                    id INTEGER PRIMARY KEY AUTOINCREMENT,\n                    from_email TEXT NOT NULL,\n                    to_email TEXT NOT NULL,\n                    subject TEXT NOT NULL,\n                    content TEXT NOT NULL,\n                    received_date TEXT NOT NULL,\n                    status TEXT DEFAULT 'NEW',\n                    tone_analysis TEXT,\n                    sentiment TEXT,\n                    replied BOOLEAN DEFAULT FALSE,\n                    reply_date TEXT,\n                    reply_content TEXT\n                )\n            ")
+            # Use SQLAlchemy text() for raw SQL
+            from sqlalchemy.sql import text
+            create_table_sql = text("""
+                CREATE TABLE IF NOT EXISTS emails (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    from_email TEXT NOT NULL,
+                    to_email TEXT NOT NULL,
+                    subject TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    received_date TEXT NOT NULL,
+                    status TEXT DEFAULT 'NEW',
+                    tone_analysis TEXT,
+                    sentiment TEXT,
+                    replied BOOLEAN DEFAULT FALSE,
+                    reply_date TEXT,
+                    reply_content TEXT
+                )
+            """)
+            await conn.execute(create_table_sql)
         logger.info("Baza danych zainicjalizowana pomyślnie")
     except Exception as e:
         logger.error(f"Błąd podczas inicjalizacji bazy danych: {str(e)}")
