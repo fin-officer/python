@@ -25,24 +25,30 @@
 
     - name: Check if MCP Email Processor is running
       uri:
-        url: "{{ mcp_email_url }}/health"
+        url: "{{ mcp_email_url }}/resources"
         method: GET
+        headers:
+          Accept: "text/event-stream"
         status_code: 200
       register: mcp_email_health
       ignore_errors: yes
 
     - name: Check if MCP Spam Detector is running
       uri:
-        url: "{{ mcp_spam_url }}/health"
+        url: "{{ mcp_spam_url }}/resources"
         method: GET
+        headers:
+          Accept: "text/event-stream"
         status_code: 200
       register: mcp_spam_health
       ignore_errors: yes
 
     - name: Check if MCP Attachment Processor is running
       uri:
-        url: "{{ mcp_attachment_url }}/health"
+        url: "{{ mcp_attachment_url }}/resources"
         method: GET
+        headers:
+          Accept: "text/event-stream"
         status_code: 200
       register: mcp_attachment_health
       ignore_errors: yes
@@ -169,11 +175,18 @@
           uri:
             url: "{{ mcp_spam_url }}/tools/detect_spam"
             method: POST
+            headers:
+              Accept: "text/event-stream"
+              Content-Type: "application/json"
             body_format: json
             body:
-              sender_email: "john.doe@finofficer.com"
-              subject: "Meeting request"
-              content: "Hello, I would like to schedule a meeting to discuss your services."
+              jsonrpc: "2.0"
+              id: "test-spam-legitimate"
+              method: "detect_spam"
+              params:
+                sender_email: "john.doe@finofficer.com"
+                subject: "Meeting request"
+                content: "Hello, I would like to schedule a meeting to discuss your services."
             status_code: 200
           register: spam_result_legitimate
           ignore_errors: yes
@@ -182,11 +195,18 @@
           uri:
             url: "{{ mcp_spam_url }}/tools/detect_spam"
             method: POST
+            headers:
+              Accept: "text/event-stream"
+              Content-Type: "application/json"
             body_format: json
             body:
-              sender_email: "unknown@suspicious-domain.xyz"
-              subject: "URGENT: Your account needs verification"
-              content: "CLICK HERE to verify your account or it will be suspended! http://suspicious-link.xyz"
+              jsonrpc: "2.0"
+              id: "test-spam-suspicious"
+              method: "detect_spam"
+              params:
+                sender_email: "unknown@suspicious-domain.xyz"
+                subject: "URGENT: Your account needs verification"
+                content: "CLICK HERE to verify your account or it will be suspended! http://suspicious-link.xyz"
             status_code: 200
           register: spam_result_suspicious
           ignore_errors: yes
@@ -214,11 +234,18 @@
           uri:
             url: "{{ mcp_attachment_url }}/tools/validate_attachment"
             method: POST
+            headers:
+              Accept: "text/event-stream"
+              Content-Type: "application/json"
             body_format: json
             body:
-              filename: "test_document.pdf"
-              file_size: 5242880  # 5MB
-              content_type: "application/pdf"
+              jsonrpc: "2.0"
+              id: "test-attachment-size"
+              method: "validate_attachment"
+              params:
+                filename: "test_document.pdf"
+                file_size: 5242880  # 5MB
+                content_type: "application/pdf"
             status_code: 200
           register: attachment_size_result
           ignore_errors: yes
@@ -227,11 +254,18 @@
           uri:
             url: "{{ mcp_attachment_url }}/tools/validate_attachment"
             method: POST
+            headers:
+              Accept: "text/event-stream"
+              Content-Type: "application/json"
             body_format: json
             body:
-              filename: "test_document.pdf"
-              file_size: 1048576  # 1MB
-              content_type: "application/pdf"
+              jsonrpc: "2.0"
+              id: "test-attachment-type-allowed"
+              method: "validate_attachment"
+              params:
+                filename: "test_document.pdf"
+                file_size: 1048576  # 1MB
+                content_type: "application/pdf"
             status_code: 200
           register: attachment_type_allowed_result
           ignore_errors: yes
@@ -240,11 +274,18 @@
           uri:
             url: "{{ mcp_attachment_url }}/tools/validate_attachment"
             method: POST
+            headers:
+              Accept: "text/event-stream"
+              Content-Type: "application/json"
             body_format: json
             body:
-              filename: "suspicious.exe"
-              file_size: 1048576  # 1MB
-              content_type: "application/x-msdownload"
+              jsonrpc: "2.0"
+              id: "test-attachment-type-blocked"
+              method: "validate_attachment"
+              params:
+                filename: "suspicious.exe"
+                file_size: 1048576  # 1MB
+                content_type: "application/x-msdownload"
             status_code: 200
           register: attachment_type_blocked_result
           ignore_errors: yes
@@ -274,13 +315,20 @@
           uri:
             url: "{{ mcp_email_url }}/tools/analyze_email"
             method: POST
+            headers:
+              Accept: "text/event-stream"
+              Content-Type: "application/json"
             body_format: json
             body:
-              email_content: "Hello, I'm interested in your accounting services. Could you send me information about your pricing and packages? I need help with my company's tax filing."
-              subject: "Inquiry about accounting services"
-              sender_name: "Jane Smith"
-              sender_email: "jane.smith@example.com"
-              has_attachments: false
+              jsonrpc: "2.0"
+              id: "test-email-analysis"
+              method: "analyze_email"
+              params:
+                email_content: "Hello, I'm interested in your accounting services. Could you send me information about your pricing and packages? I need help with my company's tax filing."
+                subject: "Inquiry about accounting services"
+                sender_name: "Jane Smith"
+                sender_email: "jane.smith@example.com"
+                has_attachments: false
             status_code: 200
           register: email_analysis_result
           ignore_errors: yes
@@ -307,12 +355,19 @@
           uri:
             url: "{{ mcp_email_url }}/tools/generate_auto_reply"
             method: POST
+            headers:
+              Accept: "text/event-stream"
+              Content-Type: "application/json"
             body_format: json
             body:
-              email_content: "Hello, I'm interested in your accounting services. Could you send me information about your pricing and packages? I need help with my company's tax filing."
-              subject: "Inquiry about accounting services"
-              sender_name: "Jane Smith"
-              sender_email: "jane.smith@example.com"
+              jsonrpc: "2.0"
+              id: "test-auto-reply"
+              method: "generate_auto_reply"
+              params:
+                email_content: "Hello, I'm interested in your accounting services. Could you send me information about your pricing and packages? I need help with my company's tax filing."
+                subject: "Inquiry about accounting services"
+                sender_name: "Jane Smith"
+                sender_email: "jane.smith@example.com"
             status_code: 200
           register: auto_reply_generation_result
           ignore_errors: yes
