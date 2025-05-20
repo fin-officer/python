@@ -1,0 +1,138 @@
+---
+# Playbook to test MCP functionality for the Email LLM Processor application
+- name: Test MCP Integration
+  hosts: localhost
+  gather_facts: yes
+  vars:
+    api_base_url: "http://localhost:8000"
+    mcp_base_url: "http://localhost:8000/mcp"
+    test_email: "user@example.com"
+  
+  tasks:
+    - name: Check if application is running
+      uri:
+        url: "{{ api_base_url }}/health"
+        method: GET
+        status_code: 200
+      register: health_check
+      ignore_errors: yes
+
+    - name: Display health check result
+      debug:
+        var: health_check
+
+    - name: Fail if application is not running
+      fail:
+        msg: "Application is not running. Please start the application before running tests."
+      when: health_check.status != 200
+      
+    - name: Test MCP Auto-Reply Functionality
+      block:
+        - name: Send test email for auto-reply
+          uri:
+            url: "{{ api_base_url }}/api/emails/process-mcp"
+            method: POST
+            body_format: json
+            body:
+              sender: "John Doe"
+              sender_email: "john.doe@example.com"
+              subject: "Question about services"
+              content: "Hello, I'm interested in your financial services. Could you provide more information about your accounting packages?"
+              attachment_ids: []
+            status_code: 200
+          register: auto_reply_result
+          ignore_errors: yes
+
+        - name: Display auto-reply result
+          debug:
+            var: auto_reply_result
+
+        - name: Verify auto-reply contains company name
+          assert:
+            that:
+              - "'Fin Officer' in auto_reply_result.json.reply"
+            fail_msg: "Auto-reply does not contain company name"
+            success_msg: "Auto-reply contains company name as expected"
+          when: auto_reply_result.status == 200
+      tags: [mcp_auto_reply]
+
+    - name: Test MCP Resources
+      block:
+        - name: List available MCP resources
+          uri:
+            url: "{{ api_base_url }}/api/mcp/resources"
+            method: GET
+            status_code: 200
+          register: resources_result
+          ignore_errors: yes
+
+        - name: Display resources result
+          debug:
+            var: resources_result
+
+        - name: Verify resources list is not empty
+          assert:
+            that:
+              - "resources_result.json.resources | length > 0"
+            fail_msg: "No MCP resources found"
+            success_msg: "MCP resources retrieved successfully"
+          when: resources_result.status == 200
+      tags: [mcp_resources]
+
+    - name: Test MCP Tools
+      block:
+        - name: List available MCP tools
+          uri:
+            url: "{{ api_base_url }}/api/mcp/tools"
+            method: GET
+            status_code: 200
+          register: tools_result
+          ignore_errors: yes
+
+        - name: Display tools result
+          debug:
+            var: tools_result
+
+        - name: Verify tools list is not empty
+          assert:
+            that:
+              - "tools_result.json.tools | length > 0"
+            fail_msg: "No MCP tools found"
+            success_msg: "MCP tools retrieved successfully"
+          when: tools_result.status == 200
+      tags: [mcp_tools]
+
+    - name: Test Email Reply Prompt
+      block:
+        - name: Get email reply prompt
+          uri:
+            url: "{{ api_base_url }}/api/prompts/email-reply"
+            method: GET
+            params:
+              email_content: "Hello, I have a question about my invoice."
+              sender_name: "Jane Smith"
+            status_code: 200
+          register: prompt_result
+          ignore_errors: yes
+
+        - name: Display prompt result
+          debug:
+            var: prompt_result
+
+        - name: Verify prompt contains sender name
+          assert:
+            that:
+              - "'Jane Smith' in prompt_result.json.prompt | string"
+            fail_msg: "Prompt does not contain sender name"
+            success_msg: "Prompt contains sender name as expected"
+          when: prompt_result.status == 200
+      tags: [mcp_prompt]
+
+    - name: Summary of MCP test results
+      debug:
+        msg: |
+          MCP Integration Test Results:
+          - Auto-Reply Functionality: {{ 'PASSED' if auto_reply_result.json is defined else 'FAILED' }}
+          - MCP Resources: {{ 'PASSED' if resources_result.json is defined else 'FAILED' }}
+          - MCP Tools: {{ 'PASSED' if tools_result.json is defined else 'FAILED' }}
+          - Email Reply Prompt: {{ 'PASSED' if prompt_result.json is defined else 'FAILED' }}
