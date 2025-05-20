@@ -1,5 +1,5 @@
-fastapi==0.88.0
-pydantic==1.10.8
+fastapi>=0.100.0  # Zaktualizowano, aby obsługiwało pydantic 2.x
+pydantic>=2.7.2  # Zaktualizowano dla kompatybilności z MCP 1.9.0
 uvicorn==0.23.2
 sqlalchemy==2.0.21
 aiosmtplib==2.0.2
@@ -8,14 +8,22 @@ python-dotenv==1.0.0
 email-validator==2.0.0.post2
 jinja2==3.1.2
 aiosqlite==0.19.0
-# fastapi-mcp==0.3.4  # Fast Model-Controller-Processor
-# Using mcp directly instead
-mcp==1.9.0  # Using the latest available version for MCP specification support
-python-multipart==0.0.6
-httpx==0.24.1
+# MCP and TinyLLM integration
+mcp==1.9.0  # Model Context Protocol support
+python-multipart>=0.0.9  # Zaktualizowano dla kompatybilności z MCP 1.9.0
+httpx>=0.27.0  # Zaktualizowano do wersji kompatybilnej z MCP 1.9.0
 email-reply-parser==0.5.12
 schedule==1.2.0
 apscheduler==3.10.4
 fastapi-utils==0.2.1
 python-dateutil==2.8.2
 aiohttp==3.8.5
+# Attachment processing dependencies
+python-magic==0.4.27  # For MIME type detection
+filetype==1.2.0  # For file type detection
+pillow==10.0.0  # For image processing
+pyPDF2==3.0.1  # For PDF text extraction
+chardet==5.1.0  # For character encoding detection
+# Security dependencies
+bandit==1.7.5  # For security scanning
+safety==2.3.5  # For dependency vulnerability checking

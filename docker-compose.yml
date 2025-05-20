@@ -14,6 +14,10 @@ services:
       - ./data:/data
     depends_on:
       - mailhog
+      - tinyllm
+      - mcp-email-processor
+      - mcp-spam-detector
+      - mcp-attachment-processor
     networks:
       - app-network
     restart: unless-stopped
@@ -27,15 +31,104 @@ services:
     networks:
       - app-network
 
-  ollama:
+  tinyllm:
     image: ollama/ollama:latest
-    container_name: ollama
+    container_name: tinyllm
     ports:
       - "11434:11434"
     volumes:
-      - ollama-data:/root/.ollama
+      - tinyllm-data:/root/.ollama
+    command: >
+      sh -c "ollama serve &
+             sleep 10 &&
+             ollama pull llama2 &&
+             tail -f /dev/null"
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  mcp-email-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: mcp-email-processor
+    env_file: .env
+    environment:
+      - MCP_EMAIL_SERVER_NAME=Fin Officer Email Processor
+      - MCP_EMAIL_MOUNT_PATH=/mcp/email
+      - MCP_EMAIL_TRANSPORT=streamable-http
+      - LLM_API_URL=http://tinyllm:11434
+      - LLM_MODEL=llama2
+      - DATABASE_URL=sqlite:///data/emails.db
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./app:/app
+      - ./data:/data
+    entrypoint: ["python", "/app/mcp_tinyllm_email_processor.py"]
+    depends_on:
+      - tinyllm
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  mcp-spam-detector:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: mcp-spam-detector
+    env_file: .env
+    environment:
+      - MCP_SPAM_SERVER_NAME=Fin Officer Spam Detector
+      - MCP_SPAM_MOUNT_PATH=/mcp/spam
+      - MCP_SPAM_TRANSPORT=streamable-http
+      - MCP_SPAM_WHITELIST=finofficer.com,trusted-partner.com
+      - LLM_API_URL=http://tinyllm:11434
+      - LLM_MODEL=llama2
+    ports:
+      - "8002:8000"
+    volumes:
+      - ./app:/app
+      - ./data:/data
+    entrypoint: ["python", "/app/mcp_spam_detection.py"]
+    depends_on:
+      - tinyllm
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  mcp-attachment-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: mcp-attachment-processor
+    env_file: .env
+    environment:
+      - MCP_ATTACHMENT_SERVER_NAME=Fin Officer Attachment Processor
+      - MCP_ATTACHMENT_MOUNT_PATH=/mcp/attachments
+      - MCP_ATTACHMENT_TRANSPORT=streamable-http
+      - MCP_MAX_ATTACHMENT_SIZE_MB=10
+      - MCP_BLOCKED_EXTENSIONS=.exe,.bat,.cmd,.sh,.js,.jar,.msi,.dll,.scr,.vbs,.ps1,.tar,.doc
+      - MCP_SCAN_ATTACHMENTS=true
+      - MCP_EXTRACT_TEXT=true
+      - MCP_ATTACHMENT_STORAGE=/data/attachments
+      - LLM_API_URL=http://tinyllm:11434
+      - LLM_MODEL=llama2
+    ports:
+      - "8003:8000"
+    volumes:
+      - ./app:/app
+      - ./data:/data
+    entrypoint: ["python", "/app/mcp_attachment_processor.py"]
+    depends_on:
+      - tinyllm
+    networks:
+      - app-network
+    restart: unless-stopped
 
   adminer:
     image: adminer:latest
@@ -54,4 +147,5 @@ networks:
     driver: bridge
 
 volumes:
+  tinyllm-data:
   ollama-data:

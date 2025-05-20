@@ -5,11 +5,13 @@
   gather_facts: yes
   vars:
     api_base_url: "http://localhost:8000"
-    mcp_base_url: "http://localhost:8000/mcp"
+    mcp_email_url: "http://localhost:8001/mcp/email"
+    mcp_spam_url: "http://localhost:8002/mcp/spam"
+    mcp_attachment_url: "http://localhost:8003/mcp/attachments"
     test_email: "user@example.com"
   
   tasks:
-    - name: Check if application is running
+    - name: Check if main application is running
       uri:
         url: "{{ api_base_url }}/health"
         method: GET
@@ -21,9 +23,42 @@
       debug:
         var: health_check
 
-    - name: Fail if application is not running
+    - name: Check if MCP Email Processor is running
+      uri:
+        url: "{{ mcp_email_url }}/health"
+        method: GET
+        status_code: 200
+      register: mcp_email_health
+      ignore_errors: yes
+
+    - name: Check if MCP Spam Detector is running
+      uri:
+        url: "{{ mcp_spam_url }}/health"
+        method: GET
+        status_code: 200
+      register: mcp_spam_health
+      ignore_errors: yes
+
+    - name: Check if MCP Attachment Processor is running
+      uri:
+        url: "{{ mcp_attachment_url }}/health"
+        method: GET
+        status_code: 200
+      register: mcp_attachment_health
+      ignore_errors: yes
+
+    - name: Display MCP services health status
+      debug:
+        msg: |
+          MCP Services Health Status:
+          - Main Application: {{ 'RUNNING' if health_check.status == 200 else 'NOT RUNNING' }}
+          - Email Processor: {{ 'RUNNING' if mcp_email_health.status == 200 else 'NOT RUNNING' }}
+          - Spam Detector: {{ 'RUNNING' if mcp_spam_health.status == 200 else 'NOT RUNNING' }}
+          - Attachment Processor: {{ 'RUNNING' if mcp_attachment_health.status == 200 else 'NOT RUNNING' }}
+
+    - name: Fail if main application is not running
       fail:
-        msg: "Application is not running. Please start the application before running tests."
+        msg: "Main application is not running. Please start the application before running tests."
       when: health_check.status != 200
       
     - name: Test MCP Auto-Reply Functionality
@@ -128,6 +163,176 @@
           when: prompt_result.status == 200
       tags: [mcp_prompt]
 
+    - name: Test MCP Spam Detection
+      block:
+        - name: Test spam detection with legitimate email
+          uri:
+            url: "{{ mcp_spam_url }}/tools/detect_spam"
+            method: POST
+            body_format: json
+            body:
+              sender_email: "john.doe@finofficer.com"
+              subject: "Meeting request"
+              content: "Hello, I would like to schedule a meeting to discuss your services."
+            status_code: 200
+          register: spam_result_legitimate
+          ignore_errors: yes
+
+        - name: Test spam detection with suspicious email
+          uri:
+            url: "{{ mcp_spam_url }}/tools/detect_spam"
+            method: POST
+            body_format: json
+            body:
+              sender_email: "unknown@suspicious-domain.xyz"
+              subject: "URGENT: Your account needs verification"
+              content: "CLICK HERE to verify your account or it will be suspended! http://suspicious-link.xyz"
+            status_code: 200
+          register: spam_result_suspicious
+          ignore_errors: yes
+
+        - name: Display spam detection results
+          debug:
+            msg: |
+              Spam Detection Results:
+              - Legitimate Email: {{ spam_result_legitimate.json.is_spam | default('N/A') }}
+              - Suspicious Email: {{ spam_result_suspicious.json.is_spam | default('N/A') }}
+
+        - name: Verify spam detection works correctly
+          assert:
+            that:
+              - "not spam_result_legitimate.json.is_spam"
+              - "spam_result_suspicious.json.is_spam"
+            fail_msg: "Spam detection is not working as expected"
+            success_msg: "Spam detection is working correctly"
+          when: spam_result_legitimate.status == 200 and spam_result_suspicious.status == 200
+      tags: [mcp_spam_detection]
+
+    - name: Test MCP Attachment Processing
+      block:
+        - name: Test attachment size validation
+          uri:
+            url: "{{ mcp_attachment_url }}/tools/validate_attachment"
+            method: POST
+            body_format: json
+            body:
+              filename: "test_document.pdf"
+              file_size: 5242880  # 5MB
+              content_type: "application/pdf"
+            status_code: 200
+          register: attachment_size_result
+          ignore_errors: yes
+
+        - name: Test attachment type validation (allowed)
+          uri:
+            url: "{{ mcp_attachment_url }}/tools/validate_attachment"
+            method: POST
+            body_format: json
+            body:
+              filename: "test_document.pdf"
+              file_size: 1048576  # 1MB
+              content_type: "application/pdf"
+            status_code: 200
+          register: attachment_type_allowed_result
+          ignore_errors: yes
+
+        - name: Test attachment type validation (blocked)
+          uri:
+            url: "{{ mcp_attachment_url }}/tools/validate_attachment"
+            method: POST
+            body_format: json
+            body:
+              filename: "suspicious.exe"
+              file_size: 1048576  # 1MB
+              content_type: "application/x-msdownload"
+            status_code: 200
+          register: attachment_type_blocked_result
+          ignore_errors: yes
+
+        - name: Display attachment validation results
+          debug:
+            msg: |
+              Attachment Validation Results:
+              - Size Validation: {{ attachment_size_result.json.is_valid | default('N/A') }}
+              - Type Validation (Allowed): {{ attachment_type_allowed_result.json.is_valid | default('N/A') }}
+              - Type Validation (Blocked): {{ attachment_type_blocked_result.json.is_valid | default('N/A') }}
+
+        - name: Verify attachment validation works correctly
+          assert:
+            that:
+              - "attachment_size_result.json.is_valid"
+              - "attachment_type_allowed_result.json.is_valid"
+              - "not attachment_type_blocked_result.json.is_valid"
+            fail_msg: "Attachment validation is not working as expected"
+            success_msg: "Attachment validation is working correctly"
+          when: attachment_size_result.status == 200 and attachment_type_allowed_result.status == 200 and attachment_type_blocked_result.status == 200
+      tags: [mcp_attachment_processing]
+
+    - name: Test MCP Email Analysis
+      block:
+        - name: Test email analysis
+          uri:
+            url: "{{ mcp_email_url }}/tools/analyze_email"
+            method: POST
+            body_format: json
+            body:
+              email_content: "Hello, I'm interested in your accounting services. Could you send me information about your pricing and packages? I need help with my company's tax filing."
+              subject: "Inquiry about accounting services"
+              sender_name: "Jane Smith"
+              sender_email: "jane.smith@example.com"
+              has_attachments: false
+            status_code: 200
+          register: email_analysis_result
+          ignore_errors: yes
+
+        - name: Display email analysis results
+          debug:
+            var: email_analysis_result
+
+        - name: Verify email analysis contains required fields
+          assert:
+            that:
+              - "'tone' in email_analysis_result.json"
+              - "'urgency' in email_analysis_result.json"
+              - "'category' in email_analysis_result.json"
+              - "'sentiment' in email_analysis_result.json"
+            fail_msg: "Email analysis is missing required fields"
+            success_msg: "Email analysis contains all required fields"
+          when: email_analysis_result.status == 200
+      tags: [mcp_email_analysis]
+
+    - name: Test MCP Auto-Reply Generation
+      block:
+        - name: Test auto-reply generation
+          uri:
+            url: "{{ mcp_email_url }}/tools/generate_auto_reply"
+            method: POST
+            body_format: json
+            body:
+              email_content: "Hello, I'm interested in your accounting services. Could you send me information about your pricing and packages? I need help with my company's tax filing."
+              subject: "Inquiry about accounting services"
+              sender_name: "Jane Smith"
+              sender_email: "jane.smith@example.com"
+            status_code: 200
+          register: auto_reply_generation_result
+          ignore_errors: yes
+
+        - name: Display auto-reply generation results
+          debug:
+            var: auto_reply_generation_result
+
+        - name: Verify auto-reply generation contains required fields
+          assert:
+            that:
+              - "'reply_content' in auto_reply_generation_result.json"
+              - "'should_send' in auto_reply_generation_result.json"
+              - "'template_used' in auto_reply_generation_result.json"
+              - "auto_reply_generation_result.json.reply_content | length > 0"
+            fail_msg: "Auto-reply generation is missing required fields or content"
+            success_msg: "Auto-reply generation contains all required fields and content"
+          when: auto_reply_generation_result.status == 200
+      tags: [mcp_auto_reply_generation]
+
     - name: Summary of MCP test results
       debug:
         msg: |
@@ -136,3 +341,7 @@
           - MCP Resources: {{ 'PASSED' if resources_result.json is defined else 'FAILED' }}
           - MCP Tools: {{ 'PASSED' if tools_result.json is defined else 'FAILED' }}
           - Email Reply Prompt: {{ 'PASSED' if prompt_result.json is defined else 'FAILED' }}
+          - Spam Detection: {{ 'PASSED' if spam_result_legitimate.json is defined and spam_result_suspicious.json is defined else 'FAILED' }}
+          - Attachment Processing: {{ 'PASSED' if attachment_size_result.json is defined and attachment_type_allowed_result.json is defined and attachment_type_blocked_result.json is defined else 'FAILED' }}
+          - Email Analysis: {{ 'PASSED' if email_analysis_result.json is defined else 'FAILED' }}
+          - Auto-Reply Generation: {{ 'PASSED' if auto_reply_generation_result.json is defined else 'FAILED' }}
