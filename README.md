@@ -147,11 +147,13 @@ FastAPI automatycznie generuje dokumentację Swagger dostępną pod adresem http
 
 ## Automatyczne odpowiedzi z użyciem MCP
 
-System obsługuje automatyczne generowanie odpowiedzi na wiadomości email przy użyciu protokołu MCP (Model Context Protocol) dla modelu TinyLLM z Ollama. Funkcjonalność ta pozwala na:
+System obsługuje automatyczne generowanie odpowiedzi na wiadomości email przy użyciu protokołu MCP (Model Context Protocol) dla modeli językowych. Funkcjonalność ta pozwala na:
 
 1. **Inteligentne odpowiedzi**: System analizuje treść wiadomości i generuje odpowiednie odpowiedzi
 2. **Kontekstowe zrozumienie**: Wykorzystuje historię konwersacji do tworzenia spójnych odpowiedzi
 3. **Personalizacja**: Dostosowuje ton i treść odpowiedzi do nadawcy
+4. **Standaryzacja interakcji**: Wykorzystuje pełną implementację protokołu MCP do strukturyzacji kontekstu
+5. **Zasoby i narzędzia**: Udostępnia dane i funkcje modelu LLM w ustandaryzowany sposób
 
 Aby użyć funkcji automatycznej odpowiedzi, wywołaj endpoint:
 
@@ -160,6 +162,8 @@ POST /api/emails/{email_id}/auto-reply
 ```
 
 System pobierze wiadomość, wygeneruje odpowiedź przy użyciu MCP i wyśle ją do nadawcy.
+
+Szczegółowa dokumentacja dotycząca implementacji MCP znajduje się w pliku [docs/MCP_INTEGRATION.md](docs/MCP_INTEGRATION.md).
 
 ## Testowanie
 

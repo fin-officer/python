@@ -23,7 +23,7 @@ def mock_db_record():
     record = AsyncMock(spec=EmailTable)
     record.id = 1
     record.from_email = "test@example.com"
-    record.to_email = "support@fin-officer.com"
+    record.to_email = "support@finofficer.com"
     record.subject = "Test Subject"
     record.content = "Test Content"
     record.received_date = "2025-05-20T00:00:00"

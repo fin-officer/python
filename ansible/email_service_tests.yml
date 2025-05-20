@@ -143,7 +143,7 @@
 
         - name: Check MailHog for auto-reply email
           uri:
-            url: "{{ mailhog_api_url }}/search?kind=from&query=support@fin-officer.com"
+            url: "{{ mailhog_api_url }}/search?kind=from&query=support@finofficer.com"
             method: GET
             return_content: yes
           register: auto_reply_mailhog_search

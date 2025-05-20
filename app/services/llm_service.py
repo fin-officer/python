@@ -199,9 +199,9 @@ class LlmService:
         company_info = {
             "name": "Fin Officer",
             "service": "Usługi finansowe i księgowe",
-            "contact_email": "contact@fin-officer.com",
-            "support_email": "support@fin-officer.com",
-            "website": "https://fin-officer.com",
+            "contact_email": "contact@finofficer.com",
+            "support_email": "support@finofficer.com",
+            "website": "https://finofficer.com",
         }
 
         # Przygotowanie historii wiadomości

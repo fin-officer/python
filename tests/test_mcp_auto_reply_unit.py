@@ -31,7 +31,7 @@ def sample_email():
     return EmailSchema(
         id=1,
         from_email="test@example.com",
-        to_email="support@fin-officer.com",
+        to_email="support@finofficer.com",
         subject="Question about financial services",
         content="Hello,\n\nI am interested in your financial services. Could you please provide more information about your accounting packages for small businesses? I currently have 5 employees and need help with monthly bookkeeping and tax filing.\n\nThank you,\nJohn",
         received_date="2025-05-20T00:40:00",

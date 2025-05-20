@@ -147,7 +147,7 @@ def sample_email():
     return EmailSchema(
         id=1,
         from_email="test@example.com",
-        to_email="support@fin-officer.com",
+        to_email="support@finofficer.com",
         subject="Test Subject",
         content="Test Content",
         received_date="2025-05-20T00:00:00"

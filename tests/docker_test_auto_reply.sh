@@ -25,7 +25,7 @@ fi
 echo -e "\n${YELLOW}Creating a test email...${NC}"
 CREATE_EMAIL_RESPONSE=$(curl -s -X POST http://localhost:8000/api/emails/process \
     -H "Content-Type: application/json" \
-    -d '{"from_email":"test@example.com","to_email":"support@fin-officer.com","subject":"Question about financial services","content":"Hello,\n\nI am interested in your financial services. Could you please provide more information about your accounting packages for small businesses? I currently have 5 employees and need help with monthly bookkeeping and tax filing.\n\nThank you,\nJohn","received_date":"'$(date -Iseconds)'"}' \
+    -d '{"from_email":"test@example.com","to_email":"support@finofficer.com","subject":"Question about financial services","content":"Hello,\n\nI am interested in your financial services. Could you please provide more information about your accounting packages for small businesses? I currently have 5 employees and need help with monthly bookkeeping and tax filing.\n\nThank you,\nJohn","received_date":"'$(date -Iseconds)'"}' \
     -w "\n%{http_code}")
 
 HTTP_CODE=$(echo "$CREATE_EMAIL_RESPONSE" | tail -n1)
