@@ -53,16 +53,28 @@ async def test_mcp_server(url: str, name: str):
     """Testuje pou0142u0105czenie z serwerem MCP"""
     print(f"\nTestowanie serwera MCP: {name}")
     try:
-        async with httpx.AsyncClient() as client:
+        # Uu017cyjemy du0142uu017cszego timeoutu dla zapytau0144 HTTP
+        async with httpx.AsyncClient(timeout=30.0) as client:
             # Inicjalizacja sesji - najpierw pobieramy nagu0142u00f3wek mcp-session-id
+            print(f"  Inicjalizacja sesji z {url}...")
             init_response = await client.get(url, headers={"Accept": "text/event-stream"})
             session_id = init_response.headers.get("mcp-session-id")
             
+            print(f"  Odpowiedu017a: {init_response.status_code} - {init_response.headers}")
+            
             if not session_id:
                 print(f"\u274c Nie mou017cna uzyskau0107 identyfikatora sesji dla serwera {name}")
-                return False
+                # Spu00f3bujmy pobrau0107 sesju0119 w inny sposu00f3b
+                print(f"  Pru00f3ba uzyskania sesji przez /resources...")
+                resources_response = await client.get(f"{url}/resources", headers={"Accept": "text/event-stream"})
+                session_id = resources_response.headers.get("mcp-session-id")
+                
+                if not session_id:
+                    print(f"\u274c Nadal nie mou017cna uzyskau0107 identyfikatora sesji")
+                    return False, None
                 
             # Teraz pobieramy zasoby z poprawnym identyfikatorem sesji
+            print(f"  Pobieranie zasobu00f3w z ID sesji: {session_id}...")
             response = await client.get(
                 f"{url}/resources", 
                 headers={
@@ -76,10 +88,21 @@ async def test_mcp_server(url: str, name: str):
                 return True, session_id
             else:
                 print(f"\u274c Serwer {name} zwru00f3ciu0142 kod bu0142u0119du: {response.status_code}")
-                print(f"Treu015bu0107 odpowiedzi: {response.text}")
+                print(f"  Treu015bu0107 odpowiedzi: {response.text}")
                 return False, None
+    except httpx.ConnectError as e:
+        print(f"\u274c Bu0142u0105d pou0142u0105czenia z serwerem {name}: {str(e)}")
+        print(f"  Sprawdź, czy serwer {name} jest uruchomiony i dostępny pod adresem {url}")
+        return False, None
+    except httpx.TimeoutError as e:
+        print(f"\u274c Timeout podczas u0142u0105czenia z serwerem {name}: {str(e)}")
+        print(f"  Serwer {name} nie odpowiada w wyznaczonym czasie")
+        return False, None
     except Exception as e:
         print(f"\u274c Bu0142u0105d podczas u0142u0105czenia z serwerem {name}: {str(e)}")
+        import traceback
+        print(f"  Szczegu00f3u0142y bu0142u0119du:
+{traceback.format_exc()}")
         return False, None
 
 
