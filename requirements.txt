@@ -10,7 +10,7 @@ jinja2==3.1.2
 aiosqlite==0.19.0
 # fastapi-mcp==0.3.4  # Fast Model-Controller-Processor
 # Using mcp directly instead
-mcp==1.9.0
+mcp==1.10.0  # Updated to latest version for full MCP specification support
 python-multipart==0.0.6
 httpx==0.24.1
 email-reply-parser==0.5.12
